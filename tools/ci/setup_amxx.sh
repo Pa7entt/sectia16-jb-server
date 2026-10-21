@@ -26,7 +26,7 @@ curl -fsSL "${BASE_URL}" | tar -xz -C "${DEST}"
 curl -fsSL "${CSTRIKE_URL}" | tar -xz -C "${DEST}"
 
 echo "[s16] Verific binar compilator..."
-USAGE_OUT="$("${DEST}/addons/amxmodx/scripting/amxxpc" 2>&1 || true)"
+USAGE_OUT="$(cd "${DEST}/addons/amxmodx/scripting" && ./amxxpc 2>&1 || true)"
 if ! echo "${USAGE_OUT}" | grep -q "Usage"; then
     echo "[s16] ATENTIE: amxxpc nu ruleaza (iesire: ${USAGE_OUT})."
     echo "[s16] Pe Ubuntu/Debian 64-bit instaleaza:"

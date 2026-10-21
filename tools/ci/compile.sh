@@ -25,15 +25,19 @@ echo "[s16] Include:  ${INCLUDE_DIR}"
 echo "[s16] Iesire:   ${PLUGINS_OUT}"
 echo ""
 
-cd "${PLUGINS_SRC}"
+# amxxpc e un launcher care isi incarca amxxpc32.so din CWD/LD_LIBRARY_PATH -
+# trebuie rulat din directorul scripting al toolchain-ului (ca si compile.sh oficial).
+export LD_LIBRARY_PATH="${SCRIPTING_DIR}:${LD_LIBRARY_PATH:-}"
+cd "${SCRIPTING_DIR}"
 
 FAIL=0
-for sma in sectia16_*.sma; do
-    out="${PLUGINS_OUT}/${sma%.sma}.amxx"
+for sma in "${PLUGINS_SRC}"/sectia16_*.sma; do
+    base="$(basename "${sma}")"
+    out="${PLUGINS_OUT}/${base%.sma}.amxx"
     echo "------------------------------------------------------------"
-    echo ">> ${sma}"
+    echo ">> ${base}"
     if ! "${AMXXPC}" "${sma}" "-o${out}" "-i${INCLUDE_DIR}"; then
-        echo "<< EZUARA: ${sma}"
+        echo "<< EZUARA: ${base}"
         FAIL=1
     else
         echo "<< OK: ${out}"
