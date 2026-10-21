@@ -276,7 +276,7 @@ bool:BuyPila(const id)
         return false;
     }
 
-    force_use(id, iBest);
+    dllfunc(DLLFunc_Use, iBest, id);
 
     S16_PlaySound(id, "sectia16/buzzer");
     S16_Print(id, "^4[SECTIA 16]^1 Ai pil it usa cu Pila de Unghii. Doar tu stii.");

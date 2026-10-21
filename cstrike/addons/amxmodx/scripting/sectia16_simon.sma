@@ -30,6 +30,10 @@ new g_pCvarFreezeTime;
 new g_szMapTargets[MAX_CELL_TARGETS][32];
 new g_iMapTargets;
 
+// muzica gratuita (spk paths fara extensie)
+new const g_szSongs[][]  = { "sectia16/manea1", "sectia16/manea2" };
+new const g_szTitles[][] = { "FARA NUMAR, BOSS!", "BA, IA ASCULTA ASTA!" };
+
 public plugin_init()
 {
     register_plugin(PLUGIN, VERSION, AUTHOR);
@@ -275,7 +279,7 @@ ActionCells(const id, const bool:bQuiet)
         iEnt = -1;
         while ((iEnt = engfunc(EngFunc_FindEntityByString, iEnt, "targetname", g_szMapTargets[i])) != 0)
         {
-            force_use(id, iEnt);
+            dllfunc(DLLFunc_Use, iEnt, id);
             iCount++;
         }
     }
@@ -289,7 +293,7 @@ ActionCells(const id, const bool:bQuiet)
             pev(iEnt, pev_target, szTarget, charsmax(szTarget));
             if (szTarget[0] && IsCellName(szTarget))
             {
-                force_use(id, iEnt);
+                dllfunc(DLLFunc_Use, iEnt, id);
                 iCount++;
             }
         }
@@ -300,7 +304,7 @@ ActionCells(const id, const bool:bQuiet)
             pev(iEnt, pev_targetname, szTarget, charsmax(szTarget));
             if (szTarget[0] && IsCellName(szTarget))
             {
-                force_use(id, iEnt);
+                dllfunc(DLLFunc_Use, iEnt, id);
                 iCount++;
             }
         }
@@ -331,21 +335,18 @@ ActionMusic(const id)
     new szName[32];
     get_user_name(id, szName, charsmax(szName));
 
-    new const szSongs[][] = { "sectia16/manea1", "sectia16/manea2" };
-    new const szTitles[][] = { "FARA NUMAR, BOSS!", "BA, IA ASCULTA ASTA!" };
+    new iIdx = random(sizeof(g_szSongs));
 
-    new iIdx = random(sizeof(szSongs));
-
-    if (!S16_CanPlay(szSongs[iIdx]))
+    if (!S16_CanPlay(g_szSongs[iIdx]))
     {
         S16_Print(id, "^4[SECTIA 16]^1 Nu exista manele pe server. Pune fisiere in sound/sectia16/.");
         return;
     }
 
-    client_cmd(0, "spk %s", szSongs[iIdx]);
+    client_cmd(0, "spk %s", g_szSongs[iIdx]);
 
     set_dhudmessage(255, 0, 255, -1.0, 0.32, 0, 8.0, 4.0);
-    show_dhudmessage(0, "*** MUZICA GRATUITA: %s ***", szTitles[iIdx]);
+    show_dhudmessage(0, "*** MUZICA GRATUITA: %s ***", g_szTitles[iIdx]);
 
     S16_PrintAll("^4[SECTIA 16]^1 Simonul ^3%s^1 a pornit muzica gratis in penitenciar!", szName);
 
@@ -478,7 +479,7 @@ LoadMapCells()
 
         if (bCollect && g_iMapTargets < MAX_CELL_TARGETS)
         {
-            copy(g_szMapTargets[g_iMapTargets], charsmax(g_szMapTargets[g_iMapTargets]), szLine);
+            copy(g_szMapTargets[g_iMapTargets], charsmax(g_szMapTargets[]), szLine);
             g_iMapTargets++;
         }
     }

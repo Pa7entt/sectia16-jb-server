@@ -454,7 +454,7 @@ public NativeGetDay(const iPlugin, const iParams)
     return g_iDay;
 }
 
-GetDayName(const iDay, const szOut[], const iLen)
+GetDayName(const iDay, szOut[], const iLen)
 {
     switch (iDay)
     {
