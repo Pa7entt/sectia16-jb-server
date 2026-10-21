@@ -1,0 +1,62 @@
+name: Compile AMXX Plugins
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "cstrike/**"
+      - "tools/**"
+      - ".github/workflows/compile.yml"
+  pull_request:
+    paths:
+      - "cstrike/**"
+      - "tools/**"
+      - ".github/workflows/compile.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: compile-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compile:
+    name: amxxpc 1.10 (linux i386)
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Runtime 32-bit pentru amxxpc
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y libc6-i386 lib32stdc++6 lib32gcc-s1
+
+      - name: Pregatire AMX Mod X 1.10
+        run: bash tools/ci/setup_amxx.sh "$RUNNER_TEMP/amxx"
+
+      - name: Compilare pluginuri (zero erori / zero warning-uri)
+        run: bash tools/ci/compile.sh "$RUNNER_TEMP/amxx/addons/amxmodx/scripting"
+
+      - name: Upload artefact .amxx
+        uses: actions/upload-artifact@v4
+        with:
+          name: sectia16-amxx-plugins
+          path: cstrike/addons/amxmodx/plugins/*.amxx
+          if-no-files-found: error
+
+      - name: Commit binare in repo
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          git config user.name  "sectia16-ci"
+          git config user.email "ci@sectia16.ro"
+          git add cstrike/addons/amxmodx/plugins
+          if git diff --cached --quiet; then
+            echo "Nimic nou de comis."
+          else
+            git commit -m "build: binare .amxx compilate cu AMXX 1.10 [skip ci]"
+            git push
+          fi

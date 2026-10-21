@@ -1,0 +1,15 @@
+# toolchain-uri locale
+toolchain/
+amxx/
+*.tar.gz
+*.tar.xz
+*.zip
+
+# log-uri & temporare
+*.log
+temp.txt
+compiled/
+
+# OS
+.DS_Store
+Thumbs.db
