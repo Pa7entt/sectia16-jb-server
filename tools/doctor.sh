@@ -305,10 +305,12 @@ if [ "${BOOTED}" -eq 1 ]; then
     echo "${AMXX_OUT}"
     echo ""
     S16_COUNT="$(echo "${AMXX_OUT}" | grep -c 'sectia16_.*running')"
-    if [ "${S16_COUNT}" -ge 10 ]; then
-        say "VERIFICARE OK: ${S16_COUNT} pluginuri SECTIA 16 running (v2.0 = 10)."
+    S16_EXPECT="$(grep -c '^sectia16_' "${WORKDIR}/repo/cstrike/addons/amxmodx/configs/plugins.ini" 2>/dev/null)"
+    [ "${S16_EXPECT}" -ge 1 ] 2>/dev/null || S16_EXPECT=12
+    if [ "${S16_COUNT}" -ge "${S16_EXPECT}" ] && [ "${S16_EXPECT}" -gt 0 ]; then
+        say "VERIFICARE OK: ${S16_COUNT} pluginuri SECTIA 16 running (v2.1 = ${S16_EXPECT})."
     else
-        say "ATENTIE: doar ${S16_COUNT} pluginuri sectia16 ruleaza (astept 10)."
+        say "ATENTIE: doar ${S16_COUNT} din ${S16_EXPECT} pluginuri sectia16 ruleaza."
         say "Vezi: journalctl -u ${S16_SERVICE} -n 50 --no-pager"
     fi
 else
