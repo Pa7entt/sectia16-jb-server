@@ -62,7 +62,8 @@ native s16_queue_freeday(const id);
 native s16_set_rebel(const id, const bool:on);
 native bool:s16_is_rebel(const id);
 
-// VIP = flag "t" (ADMIN_LEVEL_H) | Admin = flag "y" (ADMIN_ADMIN)
+// VIP = flag "t" (ADMIN_LEVEL_H) | Admin = flag "a" (ADMIN_IMMUNITY - orice
+// admin serios are imunitate; include si flag-ul "y" clasic)
 native bool:s16_is_vip(const id);
 native bool:s16_is_admin(const id);
 
@@ -77,6 +78,40 @@ native s16_get_weekday();
 
 // indexul Simonului curent (0 = nimeni)
 native s16_get_simon();
+
+// ===== sectia16_models.amxx ================================
+
+// selectia de model VIP din meniul tastei M
+// idx = 0..count-1 (modelul ales) | -1 = automat/random
+native s16_get_vip_model_count();
+native s16_get_vip_model_path(const idx, dest[], const len);
+native s16_get_vip_model_name(const idx, dest[], const len);   // 0 = nume lipsa in models.ini
+native s16_set_model_choice(const id, const idx);
+native s16_get_model_choice(const id);
+
+// ===== sectia16_simon.amxx (muzica) ========================
+
+// control muzica pentru admini (independent de Simon)
+native s16_manea_random();
+native s16_stop_music();
+
+// ===== sectia16_voice.amxx (gag) ===========================
+
+// gag: mut temporar (chat + microfon). minutes = 0 scoate gag-ul
+native s16_set_gagged(const id, const minutes);
+native bool:s16_is_gagged(const id);
+
+// ===== sectia16_ball.amxx (minge fotbal) ===================
+
+// spawneaza mingea in fata jucatorului id / sterge mingea
+native bool:s16_ball_spawn(const id);
+native s16_ball_remove();
+native bool:s16_ball_exists();
+
+// ===== sectia16_amenu.amxx (restrictie CT) ================
+
+// interdictia de a intra la echipa CT (persista in banct.ini)
+native bool:s16_is_banned_ct(const id);
 
 // ===== sectia16_days.amxx ==================================
 
@@ -432,4 +467,41 @@ stock S16_Lower(szText[])
         if (szText[i] >= 'A' && szText[i] <= 'Z')
             szText[i] += 32;
     }
+}
+
+/* ====================================================
+*   GEOMETRIE: unghiuri -> vectori
+*
+*   angle_vectors exista doar in modulul engine; il implementam
+*   nativ in Pawn (echivalentul exact al AngleVectors din HLSDK,
+*   cu roll inclus) ca sa nu depindem de niciun modul in plus.
+*  ==================================================== */
+
+#define S16_DEG2RAD 0.017453292519943295769236907684886
+
+stock S16_AngleVectors(const Float:fAngles[3], Float:fFwd[3], Float:fRight[3], Float:fUp[3])
+{
+    new Float:fRad = fAngles[1] * S16_DEG2RAD;
+    new Float:fSy = floatsin(fRad, radian);
+    new Float:fCy = floatcos(fRad, radian);
+
+    fRad = fAngles[0] * S16_DEG2RAD;
+    new Float:fSp = floatsin(fRad, radian);
+    new Float:fCp = floatcos(fRad, radian);
+
+    fRad = fAngles[2] * S16_DEG2RAD;
+    new Float:fSr = floatsin(fRad, radian);
+    new Float:fCr = floatcos(fRad, radian);
+
+    fFwd[0] = fCp * fCy;
+    fFwd[1] = fCp * fSy;
+    fFwd[2] = -fSp;
+
+    fRight[0] = fCr * fSy - fSr * fSp * fCy;
+    fRight[1] = -fSr * fSp * fSy - fCr * fCy;
+    fRight[2] = -fSr * fCp;
+
+    fUp[0] = fCr * fSp * fCy + fSr * fSy;
+    fUp[1] = fCr * fSp * fSy - fSr * fCy;
+    fUp[2] = fCr * fCp;
 }

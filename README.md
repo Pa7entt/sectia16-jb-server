@@ -2,7 +2,7 @@
 
 > **jb.sectia16.ro** — penitenciarul virtual de maximă securitate.
 > Stack: **ReHLDS + ReGameDLL + ReAPI + AMX Mod X 1.10** (100% Pawn, zero SourcePawn).
-> **v2.0** — rescriere completă: 10 pluginuri, crash-fix TE_BEAMPOINTS, Duminică = FREEday global, modele, voce, meniu M, muniție infinită CT.
+> **v2.1** — 12 pluginuri: + Minge de Fotbal cu fizică, + Meniu Admin (boți/sancțiuni/BanCT/Gag), reload infinit AK47/Deagle, viziune 3rd person, glow pentru toți, selectare model VIP din meniul M, fix crash TE_BEAMPOINTS, Duminică = FREEday global.
 
 [![Compile AMXX Plugins](https://github.com/Pa7entt/sectia16-jb-server/actions/workflows/compile.yml/badge.svg)](https://github.com/Pa7entt/sectia16-jb-server/actions/workflows/compile.yml)
 
@@ -14,14 +14,16 @@
 |---|---|
 | `sectia16_core.amxx` | **Starea centrală**: credite (vault per SteamID, +25/kill CT, +10 HS, +5/minut), freeday individual + coada „freeday garantat runda viitoare", flag REBEL (T care rănește gardian), VIP (flag `t`) / admin (flag `y`), voce LR, bun venit, `/ajutor`, `/reguli`, `/credite`. |
 | `sectia16_bhop.amxx` | **Bhop & surf uncapped**: hookchain `RG_PM_Move` (ReAPI) → `pm_fuser2 = 0.0` + auto-hop prin `pm_oldbuttons`, peste `sv_enablebunnyhopping 1`. Fără clamp-ul de 320 u/s. |
-| `sectia16_simon.amxx` | **Simon / Warden**: `/simon` sau bind `+simon`. Meniu: Alege Ziua, **Muzică/Manele** (listă dinamică din `manele.ini` + Random + **STOP MUZICĂ**), **Fluierat STRICT AUDITIV/VIZUAL — zero îngheț**, **Trage Linia** (laser continuu, vezi crash-fix-ul de mai jos), **FreeDay Individual** (`/fd [nume]`), Deschide Celulele (`cells.ini` + fallback). Glow auriu + HUD permanent. |
+| `sectia16_simon.amxx` | **Simon / Warden**: `/simon` sau bind `+simon`. Meniu: Alege Ziua, **Muzică/Manele** (listă dinamică din `manele.ini` + Random + **STOP MUZICĂ**), **Fluierat STRICT AUDITIV/VIZUAL — zero îngheț**, **Trage Linia** (laser continuu, vezi crash-fix-ul de mai jos), **FreeDay Individual** (`/fd [nume]`), Deschide Celulele (`cells.ini` + fallback), **Minge Fotbal**. Glow auriu + HUD permanent. |
 | `sectia16_days.amxx` | **Sistem de zile cu rotație automată**: Luni = Ziua Box, Marți = Gun Day, Miercuri = Ascunselea (gardieni înghețați+orbi 40s), Joi = War Day, Vineri = Zombie Day, Sâmbătă = zi normală (Simon alege prin `/zi`), **Duminică = FREEday GLOBAL AUTOMAT** (toți deținuții primesc freeday + modelul dedicat). Zilele clasice rămân: Grătar, Protopopiat, Greva Foamei. |
 | `sectia16_lr.amxx` | **Last Request** (ultimul deținut, `/lr`): Deagle la Cap (doar headshot-uri), **Shot 4 Shot** (deagle cu un glonț, pe rând), **Cowboy** (înghețați 3s spate în spate), Pălme Sănătoase (cutit 35 HP), Barbuț/Zaruri, Trivia (`trivia.ini`). **Recompensă la câștig: +3000 credite SAU FreeDay garantat runda viitoare** (meniu cu timeout). Voce pentru ambii participanți în timpul LR-ului. |
+| `sectia16_ball.amxx` | **Minge de Fotbal cu fizică completă**: `MOVETYPE_BOUNCE` (sare din pereți/jucători), gravitație proprie, fricțiune de rostogolire, se oprește natural. Se **împinge mergând în ea** și se **lovește cu glonțul** (orice armă — zboară în direcția privirii). Spawn de Simon sau admin; revine singură în teren dacă iese din hartă; dispare la finalul rundei. Model default `w_smokegrenade.mdl`; pune un `.mdl` la `models/sectia16/ball.mdl` pentru minge custom. |
+| `sectia16_amenu.amxx` | **Meniu Admin** (`/admin` sau `/amenu`): **Boți** (adaugă/umple/scoate/scoate toți — detectare automată YaPB / PodBot mm / CZ), **Sancțiuni** (Kick, Ban 30min/Permanent, BanIP 30min/Permanent, **BanCT** = interdicție persistentă de gardian în `banct.ini` + blocare `jointeam`, **Gag 10 min** = chat+microfon oprite cu expirare automată), **Control Muzică** independent de Simon, Minge Fotbal. |
 | `sectia16_shop.amxx` | **Shop secret** (`/shop`, deținuți): Vitamine (+50 HP), Feroarie (100 AP + căști), Pilă de Unghii, Pălincă 70° (viteză), Manta Invizibilă, Contrabandă (Deagle). Creditele vin din core. |
-| `sectia16_models.amxx` | **Modele de jucători** (`models.ini`): CT non-Simon, CT Simon, T normal, T rebel, T freeday (inclusiv Duminică), 7 modele VIP (random per sesiune). Pre-cache + asignare automată; **modelele lipsă sunt ignorate — serverul nu pica niciodată**. |
-| `sectia16_voice.amxx` | **Reguli microfon**: gardienii vorbesc liber oricând; teroriștii doar admin/VIP/microfon acordat (`/mic`, Simon sau admin, resetat pe rundă)/voce LR. `sv_alltalk 1` + mut per-pereche prin `rg_set_can_hear_player`, recalculat la orice schimbare. |
-| `sectia16_ctequip.amxx` | **Echipament CT**: meniu de arme la spawn (AK47, M4A1, MP5, Famas, XM1014, M249) + kevlar/căști/defuser/Deagle. **Muniție infinită STRICT pentru AK47 + Deagle, STRICT pentru gardieni** — echipa se verifică la fiecare `CurWeapon`, deci un T care ridică arma de jos NU primește muniție infinită. |
-| `sectia16_mmenu.amxx` | **Meniul tastei M** (`chooseteam` interceptat): schimbare echipă (T / CT / Spectatori) + **Setări Glow** (8 culori + OFF, doar VIP/Admini pot activa). |
+| `sectia16_models.amxx` | **Modele de jucători** (`models.ini`): CT non-Simon, CT Simon, T normal, T rebel, T freeday (inclusiv Duminică), 7 modele VIP — **VIP/Adminul își alege modelul din meniul tastei M** (altfel random per sesiune). Pre-cache + asignare automată; **modelele lipsă sunt ignorate — serverul nu pica niciodată**. |
+| `sectia16_voice.amxx` | **Reguli microfon + Gag**: gardienii vorbesc liber oricând; teroriștii doar admin/VIP/microfon acordat (`/mic`, Simon sau admin, resetat pe rundă)/voce LR. `sv_alltalk 1` + mut per-pereche prin `rg_set_can_hear_player`, recalculat la orice schimbare. **Gag** (din meniul admin): mut complet chat+microfon pe X minute, chiar și pentru gardieni, cu expirare automată și anunt. |
+| `sectia16_ctequip.amxx` | **Echipament CT**: meniu de arme la spawn (AK47, M4A1, MP5, Famas, XM1014, M249) + kevlar/căști/defuser/Deagle. **Reload infinit STRICT pentru AK47 + Deagle, STRICT pentru gardieni** — animația de reload rămâne NORMALĂ (fără clip infinit, fără reload instant); la fiecare reload rezerva se reumple la maxim prin `rg_set_user_bpammo`. Un T care ridică arma de jos NU beneficiază — echipa se verifică în hook-ul de reload. |
+| `sectia16_mmenu.amxx` | **Meniul tastei M** (`chooseteam` interceptat): (1) schimbare echipă T/CT/Spectatori — respectă interdicția BanCT; (2) **selectare model player** pentru VIP/Admin (nume reale în meniu: Goku, Deadpool...); (3) **Setări Glow**: 7 culori solide pentru TOȚI jucătorii + MULTICOLOR/Rainbow exclusiv VIP/Admin + OFF; (4) **viziune persoana a 3-a** (comutare 3rd/1st person, cameră cu protecție anti-perete prin TraceLine). |
 
 Sunetele (fluierat, ding, manele, clopote, zaruri, grătar etc.) sunt **generate procedural** — vezi `tools/gen_sounds.py`. Fără mesaje generice de tipul „This server is using AMX Mod X" (`amxx.cfg` curat + `imessage`/`scrollmsg` dezactivate).
 
@@ -46,11 +48,12 @@ sectia16-jb-server/
 │       ├── scripting/                # SURSELE .sma (+ include/ cu sectia16.inc si include-urile ReAPI)
 │       ├── plugins/                  # binarele .amxx (compilate automat de CI)
 │       └── configs/
-│           ├── plugins.ini           # 11 pluginuri baza curate + 10 SECTIA 16 (core PRIMUL)
+│           ├── plugins.ini           # 11 pluginuri baza curate + 12 SECTIA 16 (ordine topologica: furnizorii de nativi inaintea consumatorilor)
 │           ├── amxx.cfg              # versiune CURATA (zero mesaje generice)
 │           └── sectia16/
-│               ├── models.ini        # caile modelelor (CT/Simon/T/Rebel/FreeDay/VIP)
+│               ├── models.ini        # caile modelelor (CT/Simon/T/Rebel/FreeDay/VIP cu nume)
 │               ├── manele.ini        # playlist-ul Simonului (wav + mp3)
+│               ├── banct.ini         # interdictii CT (scrise de meniul admin)
 │               ├── trivia.ini        # 20 intrebari RO pentru LR Trivia
 │               └── cells.ini         # targeturi celule per harta
 └── tools/
@@ -218,7 +221,7 @@ bash tools/ci/setup_amxx.sh ~/toolchain-amxx          # descarca AMXX 1.10
 bash tools/ci/compile.sh ~/toolchain-amxx/addons/amxmodx/scripting
 ```
 
-Compilarea trebuie să treacă cu **zero erori și zero warning-uri** — asta e bariera de calitate a proiectului. v2.0 a fost verificată suplimentar **end-to-end pe server real** (ReHLDS 3.15 + metamod-r + ReGameDLL 5.30 + AMXX 1.10.0.5487 + ReAPI): 21/21 pluginuri running, zero erori runtime, supraviețuiesc mapchange-ului.
+Compilarea trebuie să treacă cu **zero erori și zero warning-uri** — asta e bariera de calitate a proiectului. v2.1 a fost verificată suplimentar **end-to-end pe server real** (ReHLDS 3.15 + metamod-r + ReGameDLL 5.30 + AMXX 1.10.0.5487 + ReAPI): 23/23 pluginuri running (11 baza + 12 SECTIA 16), zero erori runtime, supraviețuiesc mapchange-ului.
 
 ## Configurare post-instalare
 

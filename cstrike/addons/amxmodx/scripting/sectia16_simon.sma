@@ -1,6 +1,6 @@
 /*
 *   SECTIA 16 - Jailbreak CS 1.6 (jb.sectia16.ro)
-*   Simon / Warden v2.0:
+*   Simon / Warden v2.1:
 *     - /simon sau bind +simon -> primul gardian care cere preia functia
 *     - MENIUL SIMONULUI:
 *         1. Alege Ziua .............. deschide meniul zilelor (/zi)
@@ -12,7 +12,9 @@
 *                                     completi + validari limite harta)
 *         5. FreeDay Individual ...... /fd [nume] - acordat unui detinut anume
 *         6. Deschide Celulele ....... targeturi din cells.ini / fallback generic
-*         7. Renunta la Simon
+*         7. Minge Fotbal ............ arunca / ridica mingea (fizica in
+*                                     sectia16_ball.amxx)
+*         8. Renunta la Simon
 *     - glow auriu + HUD permanent cu numele Simonului
 */
 
@@ -25,7 +27,7 @@
 #pragma tabsize 4
 
 #define PLUGIN  "SECTIA 16 | Simon"
-#define VERSION "2.0.0"
+#define VERSION "2.1.0"
 #define AUTHOR  "SECTIA 16"
 
 #define TASK_SIMON_HUD   621100
@@ -75,7 +77,9 @@ public plugin_init()
 public plugin_natives()
 {
     register_library("sectia16_simon");
-    register_native("s16_get_simon", "NativeGetSimon");
+    register_native("s16_get_simon",   "NativeGetSimon");
+    register_native("s16_manea_random", "NativeManeaRandom");
+    register_native("s16_stop_music",  "NativeStopMusic");
 }
 
 public plugin_cfg()
@@ -192,7 +196,13 @@ ShowWardenMenu(const id)
     formatex(szItem, charsmax(szItem), "\wDeschide \rCelulele^n\dBuzzer + usi deschise");
     menu_additem(iMenu, szItem, "6");
 
-    menu_additem(iMenu, "\rRenunta la Simon^n\dAltu' preia tigaia", "7");
+    if (s16_ball_exists())
+        formatex(szItem, charsmax(szItem), "\wMinge \yFotbal: \rPE SOL^n\dApasa pentru a o ridica de pe teren");
+    else
+        formatex(szItem, charsmax(szItem), "\wMinge \yFotbal^n\dArunc-o in teren, la picioarele tale");
+    menu_additem(iMenu, szItem, "7");
+
+    menu_additem(iMenu, "\rRenunta la Simon^n\dAltu' preia tigaia", "8");
 
     menu_setprop(iMenu, MPROP_EXITNAME, "Inchide");
 
@@ -225,10 +235,11 @@ public WardenMenuHandler(const id, const iMenu, const iItem)
         case '4': ActionLaserToggle(id);
         case '5': ShowFreeDayMenu(id);
         case '6': ActionCells(id, false);
-        case '7': ActionResign(id);
+        case '7': ActionBall(id);
+        case '8': ActionResign(id);
     }
 
-    if (szInfo[0] != '7' && is_user_connected(id))
+    if (szInfo[0] != '8' && is_user_connected(id))
         ShowWardenMenu(id);
 
     return PLUGIN_HANDLED;
@@ -585,18 +596,48 @@ PlaySong(const id, const iSong)
     }
 
     new szName[32];
-    get_user_name(id, szName, charsmax(szName));
+
+    if (id > 0)
+    {
+        get_user_name(id, szName, charsmax(szName));
+        S16_PrintAll("^4[SECTIA 16]^1 Simonul ^3%s^1 a pornit muzica in penitenciar!", szName);
+    }
+    else
+    {
+        // id = 0: pornita de un admin, prin meniul admin
+        S16_PrintAll("^4[SECTIA 16]^1 Un admin a pornit muzica in penitenciar!");
+    }
 
     set_dhudmessage(255, 0, 255, -1.0, 0.32, 0, 8.0, 4.0);
     show_dhudmessage(0, "*** MUZICA GRATUITA: %s ***", g_szSongTitle[iSong]);
-
-    S16_PrintAll("^4[SECTIA 16]^1 Simonul ^3%s^1 a pornit muzica in penitenciar!", szName);
 
     // petele de lumina de petrecere in celule
     for (new i = 1; i <= MaxClients; i++)
     {
         if (is_user_connected(i))
             S16_ScreenFade(i, 2, 1, random_num(60, 255), random_num(60, 255), random_num(60, 255), 70, 0x0001);
+    }
+}
+
+/* ====================================================
+*   MINGE FOTBAL (fizica in sectia16_ball.amxx)
+*  ==================================================== */
+
+ActionBall(const id)
+{
+    if (s16_ball_exists())
+    {
+        s16_ball_remove();
+        S16_PrintAll("^4[SECTIA 16]^1 Simonul a ridicat mingea de pe teren. Meciul s-a terminat.");
+    }
+    else if (s16_ball_spawn(id))
+    {
+        S16_PrintAll("^4[SECTIA 16]^1 Simonul a aruncat ^3mingea de fotbal^1 in teren! Dribbling, detinuti!");
+        S16_PlaySoundAll("sectia16/ding");
+    }
+    else
+    {
+        S16_Print(id, "^4[SECTIA 16]^1 Mingea nu a putut fi aruncata - priveste catre sol, intr-un spatiu liber.");
     }
 }
 
@@ -757,6 +798,26 @@ public TaskSimonHud()
 public NativeGetSimon(const iPlugin, const iParams)
 {
     return g_iSimon;
+}
+
+/* ====================================================
+*   NATIVES MUZICA - control admin, independent de Simon
+*  ==================================================== */
+
+public NativeManeaRandom(const iPlugin, const iParams)
+{
+    if (g_iSongCount <= 0)
+        return 0;
+
+    PlaySong(0, random(g_iSongCount));
+    return 1;
+}
+
+public NativeStopMusic(const iPlugin, const iParams)
+{
+    S16_StopMusicAll();
+    S16_PrintAll("^4[SECTIA 16]^1 Muzica a fost oprita de un admin. Liniste in penitenciar!");
+    return 1;
 }
 
 LoadMapCells()

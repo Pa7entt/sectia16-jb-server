@@ -24,9 +24,10 @@
 
 #define TASK_MINUTE 514100
 
-// flag "t" = VIP | flag "y" = admin
+// flag "t" = VIP | admin = flag "a" (ADMIN_IMMUNITY) SAU "y" (ADMIN_ADMIN).
+// Orice admin real are cel putin imunitatea ("a") in users.ini.
 #define S16_VIP_FLAGS   ADMIN_LEVEL_H
-#define S16_ADMIN_FLAGS ADMIN_ADMIN
+#define S16_ADMIN_FLAGS ADMIN_IMMUNITY
 
 new const g_szTips[][] =
 {
@@ -439,7 +440,10 @@ public NativeIsAdmin(const iPlugin, const iParams)
     if (id < 0 || id > MaxClients || !is_user_connected(id))
         return false;
 
-    return bool:(get_user_flags(id) & S16_ADMIN_FLAGS);
+    new iFlags = get_user_flags(id);
+
+    // "a" (imunitate) SAU "y" (admin clasic) - acopera orice users.ini
+    return bool:(iFlags & (S16_ADMIN_FLAGS | ADMIN_ADMIN));
 }
 
 public NativeSetLRVoice(const iPlugin, const iParams)
