@@ -92,6 +92,8 @@ public plugin_precache()
 {
     g_iSpriteLaser = precache_model("sprites/laserbeam.spr");
 
+    // fluierat REAL de arbitru (limewire) + fallback procedural
+    S16_PrecacheMusic("sectia16/sfx/referee_whistle.mp3");
     S16_PrecacheSound("sectia16/fluierat");
     S16_PrecacheSound("sectia16/buzzer");
     S16_PrecacheSound("sectia16/ding");
@@ -263,7 +265,9 @@ ActionWhistle(const id)
     get_user_name(id, szName, charsmax(szName));
 
     // strict auditiv + vizual: sunet + inel de atentie in jurul Simonului
-    S16_PlaySoundAll("sectia16/fluierat");
+    // fluieratul REAL de arbitru; daca lipseste, fallback la wav procedural
+    if (!S16_PlayMusicAll("sectia16/sfx/referee_whistle.mp3"))
+        S16_PlaySoundAll("sectia16/fluierat");
 
     new Float:fOrigin[3];
     pev(id, pev_origin, fOrigin);

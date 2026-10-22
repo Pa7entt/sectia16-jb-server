@@ -84,6 +84,9 @@ public plugin_precache()
     S16_PrecacheSound("sectia16/zar");
     S16_PrecacheSound("sectia16/win");
     S16_PrecacheSound("sectia16/ding");
+
+    // SFX reale (limewire): clopot de box pentru Ziua Box
+    S16_PrecacheMusic("sectia16/sfx/boxing_bell.mp3");
 }
 
 /* ====================================================
@@ -266,7 +269,9 @@ StartDay(const iDay, const bool:bAuto)
     {
         case S16_DAY_BOX:
         {
-            S16_PlaySoundAll("sectia16/ding");
+            // clopotul REAL de box; fallback la ding daca lipseste
+            if (!S16_PlayMusicAll("sectia16/sfx/boxing_bell.mp3"))
+                S16_PlaySoundAll("sectia16/ding");
 
             set_dhudmessage(255, 200, 0, -1.0, 0.20, 0, 8.0, 5.0);
             show_dhudmessage(0, "*** ZIUA BOX ***^nCutite pentru toti, HP egal. Box in arena!");

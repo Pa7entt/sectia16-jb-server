@@ -308,10 +308,33 @@ if [ "${BOOTED}" -eq 1 ]; then
     S16_EXPECT="$(grep -c '^sectia16_' "${WORKDIR}/repo/cstrike/addons/amxmodx/configs/plugins.ini" 2>/dev/null)"
     [ "${S16_EXPECT}" -ge 1 ] 2>/dev/null || S16_EXPECT=12
     if [ "${S16_COUNT}" -ge "${S16_EXPECT}" ] && [ "${S16_EXPECT}" -gt 0 ]; then
-        say "VERIFICARE OK: ${S16_COUNT} pluginuri SECTIA 16 running (v2.1 = ${S16_EXPECT})."
+        say "VERIFICARE OK: ${S16_COUNT} pluginuri SECTIA 16 running (v2.2 = ${S16_EXPECT})."
     else
         say "ATENTIE: doar ${S16_COUNT} din ${S16_EXPECT} pluginuri sectia16 ruleaza."
         say "Vezi: journalctl -u ${S16_SERVICE} -n 50 --no-pager"
+    fi
+
+    # ----- modele + manele: raport din log-ul AMXX -----
+    say "------------------------------------------------------------"
+    say " MODELE & MANELE (din log-ul AMXX al ultimei porniri):"
+    AMXX_LOG_DIR="${S16_DIR}/cstrike/addons/amxmodx/logs"
+    MODELS_LINE="$(grep -h 'Modele incarcate' "${AMXX_LOG_DIR}"/L*.log 2>/dev/null | tail -1 || true)"
+    MANELE_LINE="$(grep -h 'Manele incarcate' "${AMXX_LOG_DIR}"/L*.log 2>/dev/null | tail -1 || true)"
+    if [ -n "${MODELS_LINE}" ]; then
+        echo "   ${MODELS_LINE}"
+        case "${MODELS_LINE}" in
+            *"ct=0 ctsimon=0 t=0"*)
+                say "   ATENTIE: modelele custom NU sunt instalate. Ruleaza:"
+                say "     curl -fsSL https://raw.githubusercontent.com/Pa7entt/sectia16-jb-server/main/tools/get_models.sh | bash -s ${S16_DIR}"
+                ;;
+        esac
+    else
+        say "   (linie 'Modele incarcate' negasita in log)"
+    fi
+    if [ -n "${MANELE_LINE}" ]; then
+        echo "   ${MANELE_LINE}"
+    else
+        say "   (linie 'Manele incarcate' negasita in log)"
     fi
 else
     say "ATENTIE: serverul nu a raspuns la RCON in ~60s."

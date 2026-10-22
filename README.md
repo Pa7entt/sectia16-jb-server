@@ -25,7 +25,7 @@
 | `sectia16_ctequip.amxx` | **Echipament CT**: meniu de arme la spawn (AK47, M4A1, MP5, Famas, XM1014, M249) + kevlar/căști/defuser/Deagle. **Reload infinit STRICT pentru AK47 + Deagle, STRICT pentru gardieni** — animația de reload rămâne NORMALĂ (fără clip infinit, fără reload instant); la fiecare reload rezerva se reumple la maxim prin `rg_set_user_bpammo`. Un T care ridică arma de jos NU beneficiază — echipa se verifică în hook-ul de reload. |
 | `sectia16_mmenu.amxx` | **Meniul tastei M** (`chooseteam` interceptat): (1) schimbare echipă T/CT/Spectatori — respectă interdicția BanCT; (2) **selectare model player** pentru VIP/Admin (nume reale în meniu: Goku, Deadpool...); (3) **Setări Glow**: 7 culori solide pentru TOȚI jucătorii + MULTICOLOR/Rainbow exclusiv VIP/Admin + OFF; (4) **viziune persoana a 3-a** (comutare 3rd/1st person, cameră cu protecție anti-perete prin TraceLine). |
 
-Sunetele (fluierat, ding, manele, clopote, zaruri, grătar etc.) sunt **generate procedural** — vezi `tools/gen_sounds.py`. Fără mesaje generice de tipul „This server is using AMX Mod X" (`amxx.cfg` curat + `imessage`/`scrollmsg` dezactivate).
+Sunetele **reale** de la LimeWire sunt incluse în repo: **3 manele MP3** (`sound/sectia16/manele/` — Ai Muschi De La Covrigi Cu Sana, Jean Gaoaza - Femeile Deșucheate, Tzanca Uraganu x Mr Juve - Damelo), **fluieratul real de arbitru** (`sfx/referee_whistle.mp3`, cu fallback automat la wav) și **clopotul de box** (`sfx/boxing_bell.mp3`, Ziua Box). Restul efectelor (ding, clopote, zaruri, grătar etc.) sunt generate procedural — `tools/gen_sounds.py`. Fără mesaje generice de tipul „This server is using AMX Mod X" (`amxx.cfg` curat + `imessage`/`scrollmsg` dezactivate).
 
 ### Fix-ul de crash „Tragerea liniei" (TE_BEAMPOINTS / TE_BEAMCYLINDER)
 
@@ -228,7 +228,7 @@ Compilarea trebuie să treacă cu **zero erori și zero warning-uri** — asta e
 1. **RCON** — schimbă `rcon_password` din `cstrike/server.cfg` (bootstrapul îl generează aleator).
 2. **Hărți JB** — `bash tools/get_maps.sh` (pachetul oficial loadcs.com); `mapcycle.txt` e deja complet.
 3. **Modele** — `bash tools/get_models.sh` sau manual în căile din `configs/sectia16/models.ini`; **VIP = flag `t`**, admin = flag `y` în `users.ini`.
-4. **Manele** — pune fișiere `.wav`/`.mp3` în `cstrike/sound/sectia16/manele/` și adaugă-le în `configs/sectia16/manele.ini` (format: `cale_sub_sound/fisier|Titlu`). Pachetul propriu: limewire.com/d/HBrpN#TokiqHVuhn.
+4. **Manele** — cele 3 piese reale sunt deja incluse. Pentru altele: pune fișiere `.wav`/`.mp3` în `cstrike/sound/sectia16/manele/` și adaugă-le în `configs/sectia16/manele.ini` (format: `cale_sub_sound/fisier|Titlu`).
 5. **Celule** — targetname-urile ușilor în `configs/sectia16/cells.ini` (altfel fallback generic).
 6. **Trivia** — întrebări în `configs/sectia16/trivia.ini` (format: `întrebare|răspuns,variantă`).
 7. **FastDL** — urcă `sound/sectia16/` + `models/` + hărțile pe un web server și setează `sv_downloadurl`. Fără FastDL, clienții descarcă cu sv_allowdownload (lent).

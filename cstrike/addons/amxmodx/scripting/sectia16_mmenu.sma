@@ -19,6 +19,12 @@
 *
 *   Camera 3rd person: entitate info_target + EngFunc_SetView,
 *   actualizata in RG_CBasePlayer_PostThink (fara module extra).
+*
+*   FIX v2.2: camera primeste un model (w_smokegrenade.mdl) si e
+*   facuta invizibila prin rendermode - EF_NODRAW oprea transmiterea
+*   entitatii catre client, deci SetView nu avea efect. Entitatea e
+*   mutata cu EngFunc_SetOrigin (leaga entitatea in lume la fiecare
+*   frame, obligatoriu pentru transmitere corecta).
 */
 
 #include <amxmodx>
@@ -30,8 +36,12 @@
 #pragma tabsize 4
 
 #define PLUGIN  "SECTIA 16 | Meniu M (Echipe, Modele, Glow, 3rd Person)"
-#define VERSION "2.1.0"
+#define VERSION "2.2.0"
 #define AUTHOR  "SECTIA 16"
+
+// model mic, existent in orice instalare CS; entitatea camerei TREBUIE
+// sa aiba modelindex != 0 ca sa fie transmisa clientului (SetView)
+new const g_szCamModel[] = "models/w_smokegrenade.mdl";
 
 #define TASK_GLOW_RAINBOW 628100
 
@@ -75,6 +85,11 @@ public plugin_init()
 
     // efectul rainbow (doar pentru cei care l-au ales)
     set_task(0.25, "TaskRainbowGlow", TASK_GLOW_RAINBOW, _, _, "b");
+}
+
+public plugin_precache()
+{
+    precache_model(g_szCamModel);
 }
 
 public client_putinserver(id)
@@ -574,8 +589,10 @@ SetThirdPerson(const id, const bool:bOn)
     if (!is_user_alive(id))
         return;
 
-    // camera noua (info_target invizibil, ne-solid) - prin fakemeta,
-    // fara dependenta de modulul engine (create_entity)
+    RemoveCamera(id);   // daca exista una veche
+
+    // camera noua: info_target invizibil prin render (NU prin EF_NODRAW,
+    // care ar opri transmiterea entitatii catre client => SetView mort)
     new iEnt = engfunc(EngFunc_CreateNamedEntity, engfunc(EngFunc_AllocString, "info_target"));
 
     if (!iEnt || !pev_valid(iEnt))
@@ -584,12 +601,23 @@ SetThirdPerson(const id, const bool:bOn)
         return;
     }
 
-    RemoveCamera(id);   // daca exista una veche
-
     set_pev(iEnt, pev_classname, "sectia16_camera");
     set_pev(iEnt, pev_movetype, MOVETYPE_NOCLIP);
     set_pev(iEnt, pev_solid, SOLID_NOT);
-    set_pev(iEnt, pev_effects, EF_NODRAW);
+
+    // modelindex != 0 e obligatoriu pentru ca entitatea sa ajunga la client
+    engfunc(EngFunc_SetModel, iEnt, g_szCamModel);
+
+    // invizibil: render transparent complet (efect client-side)
+    set_pev(iEnt, pev_rendermode, kRenderTransTexture);
+    set_pev(iEnt, pev_renderamt, 0.0);
+
+    dllfunc(DLLFunc_Spawn, iEnt);
+
+    // pozitie initiala + link in lume (EngFunc_SetOrigin leaga entitatea)
+    new Float:fOrigin[3];
+    pev(id, pev_origin, fOrigin);
+    engfunc(EngFunc_SetOrigin, iEnt, fOrigin);
 
     g_iCamera[id] = iEnt;
     engfunc(EngFunc_SetView, id, iEnt);
@@ -648,7 +676,9 @@ public OnPlayerPostThink(const id)
         fCam[2] = fHit[2] - fFwd[2] * 8.0;
     }
 
-    set_pev(g_iCamera[id], pev_origin, fCam);
+    // SetOrigin (nu set_pev) - relink-uia entitatea in lume la fiecare
+    // frame, altfel clientul poate sa nu primeasca actualizarile de pozitie
+    engfunc(EngFunc_SetOrigin, g_iCamera[id], fCam);
     set_pev(g_iCamera[id], pev_angles, fAngles);
-    // camera e invizibila prin EF_NODRAW (setat la creare)
+    // camera e invizibila prin renderamt 0 (setat la creare)
 }
