@@ -1,9 +1,18 @@
 /*
 *   SECTIA 16 - Jailbreak CS 1.6 (jb.sectia16.ro)
-*   Simon / Warden:
+*   Simon / Warden v2.0:
 *     - /simon sau bind +simon -> primul gardian care cere preia functia
-*     - Meniul Simonului: Fluierat (inghet detinuti), Traseaza Linie (laser TE_BEAMPOINTS),
-*       Deschide Celulele (targeturi din cells.ini / fallback generic), Muzica Gratuita (manele)
+*     - MENIUL SIMONULUI:
+*         1. Alege Ziua .............. deschide meniul zilelor (/zi)
+*         2. Muzica / Manele ......... submeniu: alege melodia / random / STOP
+*         3. Fluierat ................ ATENTIE sonora - STRICT AUDITIV/VIZUAL,
+*                                     FARA INGHET AREA DETINUTILOR
+*         4. Trage Linia ............. laser continuu in directia privirii
+*                                     (FIX CRASH: parametri TE_BEAMPOINTS
+*                                     completi + validari limite harta)
+*         5. FreeDay Individual ...... /fd [nume] - acordat unui detinut anume
+*         6. Deschide Celulele ....... targeturi din cells.ini / fallback generic
+*         7. Renunta la Simon
 *     - glow auriu + HUD permanent cu numele Simonului
 */
 
@@ -16,23 +25,27 @@
 #pragma tabsize 4
 
 #define PLUGIN  "SECTIA 16 | Simon"
-#define VERSION "1.0.0"
+#define VERSION "2.0.0"
 #define AUTHOR  "SECTIA 16"
 
-#define TASK_SIMON_HUD 621100
-
-new g_iSimon;
-new g_iSpriteLaser;
-new g_pCvarFreezeTime;
+#define TASK_SIMON_HUD   621100
+#define TASK_LASER_DRAW  621200
 
 // targeturi de celule configurate per harta (cells.ini)
 #define MAX_CELL_TARGETS 24
 new g_szMapTargets[MAX_CELL_TARGETS][32];
 new g_iMapTargets;
 
-// muzica gratuita (spk paths fara extensie)
-new const g_szSongs[][]  = { "sectia16/manea1", "sectia16/manea2" };
-new const g_szTitles[][] = { "FARA NUMAR, BOSS!", "BA, IA ASCULTA ASTA!" };
+// muzica din configs/sectia16/manele.ini (cale sub sound/ | titlu)
+#define MAX_SONGS 32
+new g_szSongPath[MAX_SONGS][96];
+new g_szSongTitle[MAX_SONGS][64];
+new g_iSongCount;
+
+new g_iSimon;
+new g_iSpriteLaser;
+new bool:g_bLaserOn[MAX_PLAYERS + 1];
+new Float:g_flNextWhistle = 0.0;
 
 public plugin_init()
 {
@@ -44,18 +57,21 @@ public plugin_init()
     register_clcmd("-simon",          "CmdIgnore");
     register_clcmd("say /meniu",      "CmdMenu");
     register_clcmd("say_team /meniu", "CmdMenu");
+    register_clcmd("say /fd",         "CmdFreeDay");
+    register_clcmd("say_team /fd",    "CmdFreeDay");
+    register_clcmd("say /freeday",    "CmdFreeDay");
+    register_clcmd("say_team /freeday", "CmdFreeDay");
+    register_clcmd("say",             "CmdSay");
+    register_clcmd("say_team",        "CmdSay");
 
-    register_event("HLTV",    "EventNewRound", "a", "1=0", "2=0");
+    register_event("HLTV",     "EventNewRound", "a", "1=0", "2=0");
     register_event("DeathMsg", "EventDeathMsg", "a");
     register_event("TeamInfo", "EventTeamInfo", "a");
 
-    g_pCvarFreezeTime = register_cvar("s16_whistle_freeze", "3");
-
     set_task(1.0, "TaskSimonHud", TASK_SIMON_HUD, _, _, "b");
+    set_task(0.2, "TaskLaserDraw", TASK_LASER_DRAW, _, _, "b");
 }
 
-// nativii cross-plugin se inregistreaza AICI (nu in plugin_init) ca sa fie
-// disponibili pluginurilor incarcate dupa acesta (days/lr ii folosesc)
 public plugin_natives()
 {
     register_library("sectia16_simon");
@@ -65,6 +81,7 @@ public plugin_natives()
 public plugin_cfg()
 {
     LoadMapCells();
+    LoadSongs();
 }
 
 public plugin_precache()
@@ -73,8 +90,11 @@ public plugin_precache()
 
     S16_PrecacheSound("sectia16/fluierat");
     S16_PrecacheSound("sectia16/buzzer");
-    S16_PrecacheSound("sectia16/manea1");
-    S16_PrecacheSound("sectia16/manea2");
+    S16_PrecacheSound("sectia16/ding");
+    S16_PrecacheSound("sectia16/win");
+
+    for (new i = 0; i < g_iSongCount; i++)
+        S16_PrecacheMusic(g_szSongPath[i]);
 }
 
 /* ====================================================
@@ -109,6 +129,7 @@ public CmdSimon(id)
     }
 
     g_iSimon = id;
+    g_bLaserOn[id] = false;
 
     new szName[32];
     get_user_name(id, szName, charsmax(szName));
@@ -116,7 +137,7 @@ public CmdSimon(id)
     S16_RenderGlow(id, 255, 200, 0, 80);
 
     S16_PrintAll("^4[SECTIA 16]^3 %s^1 este noul SIMON! Ordinele lui sunt lege.", szName);
-    S16_PlaySoundAll("sectia16/fluierat");
+    S16_PlaySoundAll("sectia16/ding");
 
     set_dhudmessage(255, 200, 0, -1.0, 0.22, 0, 6.0, 3.0);
     show_dhudmessage(0, "*** SIMON: %s ***", szName);
@@ -149,12 +170,29 @@ ShowWardenMenu(const id)
     new iMenu = menu_create(szTitle, "WardenMenuHandler");
 
     new szItem[96];
-    formatex(szItem, charsmax(szItem), "\wFluierat / \rAtentie!^n\dFluier + inghet detinuti %d secunde", get_pcvar_num(g_pCvarFreezeTime));
+
+    formatex(szItem, charsmax(szItem), "\wAlege \rZiua^n\dBox, Gun Day, Ascunselea, War, Zombie...");
     menu_additem(iMenu, szItem, "1");
-    menu_additem(iMenu, "\wTraseaza \yLinie^n\dLaser rosu pe sol, in directia ta", "2");
-    menu_additem(iMenu, "\wDeschide \rCelulele^n\dBuzzer + usi deschise", "3");
-    menu_additem(iMenu, "\wMuzica \yGratuita^n\dManele pe boxele sectiei", "4");
-    menu_additem(iMenu, "\rRenunta la Simon^n\dAltu' preia tigaia", "5");
+
+    formatex(szItem, charsmax(szItem), "\wMuzica / \yManele^n\dAlege, da la intamplare sau opreste");
+    menu_additem(iMenu, szItem, "2");
+
+    formatex(szItem, charsmax(szItem), "\wFluierat \r(Atentie!)^n\dStrict auditiv - NU ingheata pe nimeni");
+    menu_additem(iMenu, szItem, "3");
+
+    if (g_bLaserOn[id])
+        formatex(szItem, charsmax(szItem), "\wTraseaza \yLinia: \rOPRIT^n\dLaser rosu pe sol, in directia ta");
+    else
+        formatex(szItem, charsmax(szItem), "\wTraseaza \yLinia: \rACTIV^n\dLaser rosu pe sol, in directia ta");
+    menu_additem(iMenu, szItem, "4");
+
+    formatex(szItem, charsmax(szItem), "\wFreeDay \yIndividual^n\dAcorda freeday unui detinut (/fd)");
+    menu_additem(iMenu, szItem, "5");
+
+    formatex(szItem, charsmax(szItem), "\wDeschide \rCelulele^n\dBuzzer + usi deschise");
+    menu_additem(iMenu, szItem, "6");
+
+    menu_additem(iMenu, "\rRenunta la Simon^n\dAltu' preia tigaia", "7");
 
     menu_setprop(iMenu, MPROP_EXITNAME, "Inchide");
 
@@ -177,55 +215,94 @@ public WardenMenuHandler(const id, const iMenu, const iItem)
 
     new iAccess, szInfo[3], szName[64], iCallback;
     menu_item_getinfo(iMenu, iItem, iAccess, szInfo, charsmax(szInfo), szName, charsmax(szName), iCallback);
+    menu_destroy(iMenu);
 
     switch (szInfo[0])
     {
-        case '1': ActionWhistle(id);
-        case '2': ActionLaser(id);
-        case '3': ActionCells(id, false);
-        case '4': ActionMusic(id);
-        case '5': ActionResign(id);
+        case '1': client_cmd(id, "say /zi");
+        case '2': ShowMusicMenu(id);
+        case '3': ActionWhistle(id);
+        case '4': ActionLaserToggle(id);
+        case '5': ShowFreeDayMenu(id);
+        case '6': ActionCells(id, false);
+        case '7': ActionResign(id);
     }
 
-    menu_destroy(iMenu);
-
-    if (szInfo[0] != '5' && is_user_connected(id))
+    if (szInfo[0] != '7' && is_user_connected(id))
         ShowWardenMenu(id);
 
     return PLUGIN_HANDLED;
 }
 
 /* ====================================================
-*   ACTIUNI WARDEN
+*   FLUIERAT - STRICT AUDITIV/VIZUAL, ZERO INGHET
 *  ==================================================== */
 
 ActionWhistle(const id)
 {
+    new Float:fNow = get_gametime();
+    if (fNow < g_flNextWhistle)
+    {
+        S16_Print(id, "^4[SECTIA 16]^1 Mai lasa fluierul o clipa, ti-au ramas urechile fisiate.");
+        return;
+    }
+    g_flNextWhistle = fNow + 3.0;
+
     new szName[32];
     get_user_name(id, szName, charsmax(szName));
 
+    // strict auditiv + vizual: sunet + inel de atentie in jurul Simonului
     S16_PlaySoundAll("sectia16/fluierat");
 
+    new Float:fOrigin[3];
+    pev(id, pev_origin, fOrigin);
+    S16_DrawRing(g_iSpriteLaser, fOrigin, 350.0, 255, 90, 0, 12, 10);
+
     set_dhudmessage(255, 70, 0, -1.0, 0.25, 0, 6.0, 3.0);
-    show_dhudmessage(0, "*** ATENTIE! DETINUTII SUNT INGHETATI ***");
+    show_dhudmessage(0, "*** FLUIERAT DE LA %s ***^nAtentie, detinuti!", szName);
 
-    S16_PrintAll("^4[SECTIA 16]^1 Fluierat de la ^3%s^1! Detinutii stau pe loc ^3%d secunde^1.", szName, get_pcvar_num(g_pCvarFreezeTime));
+    S16_PrintAll("^4[SECTIA 16]^1 Fluierat de la ^3%s^1! Doar atentie - nimeni nu e inghetat.", szName);
+}
 
-    new Float:fFreeze = get_pcvar_float(g_pCvarFreezeTime);
+/* ====================================================
+*   TRAGE LINIA - FIX CRASH TE_BEAMPOINTS
+*
+*   v1 crapa pentru ca mesajul TE_BEAMPOINTS era trimis fara
+*   startframe + framerate (2 bytes mai putin decat citeste
+*   parserul motorului) si fara validari. Acum:
+*     - se deseneaza doar daca Simon e CONECTAT si IN VIATA
+*     - punctele sunt clamp-uite si validate in limitele lumii
+*     - mesajul se trimite prin S16_DrawBeam (parametri completi)
+*  ==================================================== */
 
-    new iPlayers[MAX_PLAYERS], iNum;
-    get_players(iPlayers, iNum, "ae", "TERRORIST");
-    for (new i = 0; i < iNum; i++)
+ActionLaserToggle(const id)
+{
+    g_bLaserOn[id] = !g_bLaserOn[id];
+
+    if (g_bLaserOn[id])
     {
-        S16_Freeze(iPlayers[i], fFreeze);
-        S16_ScreenFade(iPlayers[i], 1, 1, 255, 90, 0, 90, 0x0001);
+        S16_PrintAll("^4[SECTIA 16]^1 Simonul a pornit ^3linia laser^1. Cine o trece, plateste.");
+        S16_PlaySound(id, "sectia16/ding");
+    }
+    else
+    {
+        S16_PrintAll("^4[SECTIA 16]^1 Linia laser a fost oprita.");
     }
 }
 
-ActionLaser(const id)
+public TaskLaserDraw()
 {
+    if (!g_iSimon)
+        return;
+
+    new id = g_iSimon;
+
+    // validari stricte inainte de orice mesaj de retea
+    if (!g_bLaserOn[id] || !is_user_connected(id) || !is_user_alive(id))
+        return;
+
     new iAim[3];
-    get_user_origin(id, iAim, 3);
+    get_user_origin(id, iAim, 3);   // 3 = punctul de contact al privirii
 
     new Float:fAim[3], Float:fDir[3], Float:fStart[3], Float:fEnd[3];
     fAim[0] = float(iAim[0]);
@@ -242,6 +319,7 @@ ActionLaser(const id)
     fDir[0] /= fLen;
     fDir[1] /= fLen;
 
+    // linia pe sol, simetric in jurul punctului privit
     for (new i = 0; i < 3; i++)
     {
         fStart[i] = fAim[i] + fDir[i] * 450.0;
@@ -250,27 +328,281 @@ ActionLaser(const id)
     fStart[2] = fAim[2] + 6.0;
     fEnd[2]   = fAim[2] + 6.0;
 
-    message_begin(MSG_BROADCAST, SVC_TEMPENTITY);
-    write_byte(TE_BEAMPOINTS);
-    write_coord(floatround(fStart[0]));
-    write_coord(floatround(fStart[1]));
-    write_coord(floatround(fStart[2]));
-    write_coord(floatround(fEnd[0]));
-    write_coord(floatround(fEnd[1]));
-    write_coord(floatround(fEnd[2]));
-    write_short(g_iSpriteLaser);
-    write_byte(100);     // viata: 100 x 0.1s = 10 secunde
-    write_byte(14);      // latime
-    write_byte(0);       // amplitudine (0 = linie fixa)
-    write_byte(255);     // R
-    write_byte(40);      // G
-    write_byte(40);      // B
-    write_byte(220);     // luminozitate
-    write_byte(35);      // viteza de scroll
-    message_end();
-
-    S16_PrintAll("^4[SECTIA 16]^1 Simonul a trasat o linie rosie pe sol. Cine o trece, plateste.");
+    // S16_DrawBeam: clamp + validare limite lume + parametri TE completi
+    S16_DrawBeam(g_iSpriteLaser, fStart, fEnd, 255, 40, 40, 2, 14);
 }
+
+/* ====================================================
+*   FREEDAY INDIVIDUAL (/fd [nume] sau meniu)
+*  ==================================================== */
+
+public CmdSay(id)
+{
+    new szArgs[96];
+    read_args(szArgs, charsmax(szArgs));
+    remove_quotes(szArgs);
+    trim(szArgs);
+
+    if (!szArgs[0])
+        return PLUGIN_CONTINUE;
+
+    // "/fd <nume>" sau "/freeday <nume>"
+    if (equali(szArgs, "/fd ", 4) || equali(szArgs, "/freeday ", 9))
+    {
+        new szCmd[16], szTarget[64];
+        argbreak(szArgs, szCmd, charsmax(szCmd), szTarget, charsmax(szTarget));
+        trim(szTarget);
+
+        if (szTarget[0])
+        {
+            GrantFreeDayByName(id, szTarget);
+            return PLUGIN_HANDLED;
+        }
+    }
+
+    return PLUGIN_CONTINUE;
+}
+
+public CmdFreeDay(id)
+{
+    if (id != g_iSimon)
+    {
+        S16_Print(id, "^4[SECTIA 16]^1 Doar Simonul poate acorda FreeDay individual.");
+        return PLUGIN_HANDLED;
+    }
+
+    ShowFreeDayMenu(id);
+    return PLUGIN_HANDLED;
+}
+
+ShowFreeDayMenu(const id)
+{
+    new iPlayers[MAX_PLAYERS], iNum;
+    get_players(iPlayers, iNum, "ae", "TERRORIST");
+
+    if (!iNum)
+    {
+        S16_Print(id, "^4[SECTIA 16]^1 Nu sunt detinuti in viata carora sa le acorzi freeday.");
+        return;
+    }
+
+    new iMenu = menu_create("\r[SECTIA 16] \yFreeDay Individual^n\dAlege detinutul norocos", "FreeDayMenuHandler");
+
+    new szName[40], szInfo[6], szItem[72];
+    for (new i = 0; i < iNum; i++)
+    {
+        get_user_name(iPlayers[i], szName, charsmax(szName));
+        num_to_str(iPlayers[i], szInfo, charsmax(szInfo));
+
+        if (s16_has_freeday(iPlayers[i]))
+            formatex(szItem, charsmax(szItem), "\w%s \d[deja are FD]", szName);
+        else
+            formatex(szItem, charsmax(szItem), "\w%s", szName);
+
+        menu_additem(iMenu, szItem, szInfo);
+    }
+
+    menu_setprop(iMenu, MPROP_EXITNAME, "Inapoi");
+    menu_display(id, iMenu, 0);
+}
+
+public FreeDayMenuHandler(const id, const iMenu, const iItem)
+{
+    if (iItem == MENU_EXIT || iItem < 0)
+    {
+        menu_destroy(iMenu);
+        return PLUGIN_HANDLED;
+    }
+
+    if (id != g_iSimon)
+    {
+        menu_destroy(iMenu);
+        return PLUGIN_HANDLED;
+    }
+
+    new iAccess, szInfo[6], szName[64], iCallback;
+    menu_item_getinfo(iMenu, iItem, iAccess, szInfo, charsmax(szInfo), szName, charsmax(szName), iCallback);
+    menu_destroy(iMenu);
+
+    new iTarget = str_to_num(szInfo);
+
+    if (!is_user_alive(iTarget) || get_member(iTarget, m_iTeam) != TEAM_TERRORIST)
+    {
+        S16_Print(id, "^4[SECTIA 16]^1 Detinutul nu mai e valabil.");
+        return PLUGIN_HANDLED;
+    }
+
+    GrantFreeDay(id, iTarget);
+    return PLUGIN_HANDLED;
+}
+
+GrantFreeDayByName(const id, const szTarget[])
+{
+    if (id != g_iSimon)
+    {
+        S16_Print(id, "^4[SECTIA 16]^1 Doar Simonul poate acorda FreeDay individual.");
+        return;
+    }
+
+    new iTarget = FindPlayerByName(szTarget);
+
+    if (!iTarget || !is_user_alive(iTarget) || get_member(iTarget, m_iTeam) != TEAM_TERRORIST)
+    {
+        S16_Print(id, "^4[SECTIA 16]^1 Nu am gasit detinutul ^3%s^1.", szTarget);
+        return;
+    }
+
+    GrantFreeDay(id, iTarget);
+}
+
+GrantFreeDay(const id, const iTarget)
+{
+    if (s16_has_freeday(iTarget))
+    {
+        S16_Print(id, "^4[SECTIA 16]^1 Detinutul are deja freeday.");
+        return;
+    }
+
+    s16_set_freeday(iTarget, true);
+    S16_RenderGlow(iTarget, 0, 255, 0, 60);
+
+    new szT[32], szS[32];
+    get_user_name(iTarget, szT, charsmax(szT));
+    get_user_name(id, szS, charsmax(szS));
+
+    S16_PrintAll("^4[SECTIA 16]^1 Simonul ^3%s^1 i-a acordat ^4FreeDay^1 lui ^3%s^1!", szS, szT);
+    S16_Print(iTarget, "^4[SECTIA 16]^1 Ai primit ^4FreeDay^1! Nimeni nu-ti poate da ordine.");
+
+    S16_PlaySound(iTarget, "sectia16/win");
+}
+
+FindPlayerByName(const szName[])
+{
+    new iPlayers[MAX_PLAYERS], iNum;
+    get_players(iPlayers, iNum, "c");
+
+    new szCheck[40];
+
+    // potrivire exacta, apoi partiala
+    for (new i = 0; i < iNum; i++)
+    {
+        get_user_name(iPlayers[i], szCheck, charsmax(szCheck));
+        if (equali(szCheck, szName))
+            return iPlayers[i];
+    }
+
+    for (new i = 0; i < iNum; i++)
+    {
+        get_user_name(iPlayers[i], szCheck, charsmax(szCheck));
+        if (containi(szCheck, szName) != -1)
+            return iPlayers[i];
+    }
+
+    return 0;
+}
+
+/* ====================================================
+*   MUZICA / MANELE (submeniu)
+*  ==================================================== */
+
+ShowMusicMenu(const id)
+{
+    new szTitle[128];
+    formatex(szTitle, charsmax(szTitle), "\r[SECTIA 16] \yMuzica / Manele^n\dMelodii: \r%d^n\dPune fisiere in sound/sectia16/manele/", g_iSongCount);
+
+    new iMenu = menu_create(szTitle, "MusicMenuHandler");
+
+    if (g_iSongCount)
+    {
+        new szItem[96], szInfo[6];
+        for (new i = 0; i < g_iSongCount; i++)
+        {
+            num_to_str(i, szInfo, charsmax(szInfo));
+            formatex(szItem, charsmax(szItem), "\w%s", g_szSongTitle[i]);
+            menu_additem(iMenu, szItem, szInfo);
+        }
+
+        menu_additem(iMenu, "\yMelodie Random^n\dNoriqa decide pentru tine", "r");
+    }
+    else
+    {
+        menu_additem(iMenu, "\dNicio melodie disponibila", "x");
+    }
+
+    menu_additem(iMenu, "\rSTOP MUZICA^n\dOreste instant sunetul pentru toti", "s");
+
+    menu_setprop(iMenu, MPROP_EXITNAME, "Inapoi");
+    menu_display(id, iMenu, 0);
+}
+
+public MusicMenuHandler(const id, const iMenu, const iItem)
+{
+    if (iItem == MENU_EXIT || iItem < 0)
+    {
+        menu_destroy(iMenu);
+        return PLUGIN_HANDLED;
+    }
+
+    if (id != g_iSimon || !is_user_alive(id))
+    {
+        menu_destroy(iMenu);
+        return PLUGIN_HANDLED;
+    }
+
+    new iAccess, szInfo[6], szName[64], iCallback;
+    menu_item_getinfo(iMenu, iItem, iAccess, szInfo, charsmax(szInfo), szName, charsmax(szName), iCallback);
+    menu_destroy(iMenu);
+
+    if (szInfo[0] == 'x')
+        return PLUGIN_HANDLED;
+
+    if (szInfo[0] == 's')
+    {
+        S16_StopMusicAll();
+        S16_PrintAll("^4[SECTIA 16]^1 Simonul a oprit muzica. Tacere in aula!");
+        return PLUGIN_HANDLED;
+    }
+
+    if (szInfo[0] == 'r')
+    {
+        PlaySong(id, random(g_iSongCount));
+        return PLUGIN_HANDLED;
+    }
+
+    PlaySong(id, str_to_num(szInfo));
+    return PLUGIN_HANDLED;
+}
+
+PlaySong(const id, const iSong)
+{
+    if (iSong < 0 || iSong >= g_iSongCount)
+        return;
+
+    if (!S16_PlayMusicAll(g_szSongPath[iSong]))
+    {
+        S16_Print(id, "^4[SECTIA 16]^1 Fisierul ^3%s^1 lipseste de pe server.", g_szSongPath[iSong]);
+        return;
+    }
+
+    new szName[32];
+    get_user_name(id, szName, charsmax(szName));
+
+    set_dhudmessage(255, 0, 255, -1.0, 0.32, 0, 8.0, 4.0);
+    show_dhudmessage(0, "*** MUZICA GRATUITA: %s ***", g_szSongTitle[iSong]);
+
+    S16_PrintAll("^4[SECTIA 16]^1 Simonul ^3%s^1 a pornit muzica in penitenciar!", szName);
+
+    // petele de lumina de petrecere in celule
+    for (new i = 1; i <= MaxClients; i++)
+    {
+        if (is_user_connected(i))
+            S16_ScreenFade(i, 2, 1, random_num(60, 255), random_num(60, 255), random_num(60, 255), 70, 0x0001);
+    }
+}
+
+/* ====================================================
+*   CELULE (cells.ini + fallback)
+*  ==================================================== */
 
 ActionCells(const id, const bool:bQuiet)
 {
@@ -335,34 +667,6 @@ ActionCells(const id, const bool:bQuiet)
     return iCount;
 }
 
-ActionMusic(const id)
-{
-    new szName[32];
-    get_user_name(id, szName, charsmax(szName));
-
-    new iIdx = random(sizeof(g_szSongs));
-
-    if (!S16_CanPlay(g_szSongs[iIdx]))
-    {
-        S16_Print(id, "^4[SECTIA 16]^1 Nu exista manele pe server. Pune fisiere in sound/sectia16/.");
-        return;
-    }
-
-    client_cmd(0, "spk %s", g_szSongs[iIdx]);
-
-    set_dhudmessage(255, 0, 255, -1.0, 0.32, 0, 8.0, 4.0);
-    show_dhudmessage(0, "*** MUZICA GRATUITA: %s ***", g_szTitles[iIdx]);
-
-    S16_PrintAll("^4[SECTIA 16]^1 Simonul ^3%s^1 a pornit muzica gratis in penitenciar!", szName);
-
-    // petele de lumina de petrecere in celule
-    for (new i = 1; i <= MaxClients; i++)
-    {
-        if (is_user_connected(i))
-            S16_ScreenFade(i, 2, 1, random_num(60, 255), random_num(60, 255), random_num(60, 255), 70, 0x0001);
-    }
-}
-
 ActionResign(const id)
 {
     if (g_iSimon != id)
@@ -373,6 +677,7 @@ ActionResign(const id)
 
     S16_RenderReset(id);
     g_iSimon = 0;
+    g_bLaserOn[id] = false;
 
     S16_PrintAll("^4[SECTIA 16]^1 ^3%s^1 a renuntat la functia de Simon. Cine urmeaza? (/simon)", szName);
 }
@@ -384,6 +689,9 @@ ActionResign(const id)
 public EventNewRound()
 {
     g_iSimon = 0;
+
+    for (new id = 1; id <= MaxClients; id++)
+        g_bLaserOn[id] = false;
 }
 
 public EventDeathMsg()
@@ -396,6 +704,7 @@ public EventDeathMsg()
 
         S16_RenderReset(iVictim);
         g_iSimon = 0;
+        g_bLaserOn[iVictim] = false;
 
         S16_PrintAll("^4[SECTIA 16]^1 Simonul ^3%s^1 a fost lichidat! Gardienii raman fara sef.", szName);
     }
@@ -420,6 +729,8 @@ public EventTeamInfo()
 
 public client_disconnected(id)
 {
+    g_bLaserOn[id] = false;
+
     if (id == g_iSimon)
     {
         g_iSimon = 0;
@@ -428,7 +739,7 @@ public client_disconnected(id)
 }
 
 /* ====================================================
-*   HUD + NATIVE + CELLS.INI
+*   HUD + NATIVE + CONFIGS
 *  ==================================================== */
 
 public TaskSimonHud()
@@ -490,6 +801,60 @@ LoadMapCells()
     }
 
     fclose(hFile);
+}
+
+// manele.ini: "cale_sub_sound/fisier.wav|Titlu"
+LoadSongs()
+{
+    new szPath[128];
+    formatex(szPath, charsmax(szPath), "addons/amxmodx/configs/sectia16/manele.ini");
+
+    new hFile = fopen(szPath, "rt");
+    if (!hFile)
+    {
+        log_amx("[SECTIA 16] manele.ini lipseste - meniul de muzica va fi gol.");
+        return;
+    }
+
+    new szLine[192], szPathPart[96], szTitlePart[64];
+
+    while (fgets(hFile, szLine, charsmax(szLine)) && g_iSongCount < MAX_SONGS)
+    {
+        trim(szLine);
+
+        if (!szLine[0] || szLine[0] == ';' || szLine[0] == '#')
+            continue;
+
+        new iPos = contain(szLine, "|");
+        if (iPos <= 0)
+            continue;
+
+        // calea fisierului (sub sound/, cu extensie)
+        new j = 0;
+        for (new k = 0; k < iPos && j < charsmax(szPathPart); k++, j++)
+            szPathPart[j] = szLine[k];
+        szPathPart[j] = 0;
+
+        // titlul afisat in meniu
+        j = 0;
+        for (new k = iPos + 1; szLine[k] && j < charsmax(szTitlePart); k++, j++)
+            szTitlePart[j] = szLine[k];
+        szTitlePart[j] = 0;
+
+        trim(szPathPart);
+        trim(szTitlePart);
+
+        if (!szPathPart[0] || !szTitlePart[0])
+            continue;
+
+        copy(g_szSongPath[g_iSongCount], charsmax(g_szSongPath[]), szPathPart);
+        copy(g_szSongTitle[g_iSongCount], charsmax(g_szSongTitle[]), szTitlePart);
+        g_iSongCount++;
+    }
+
+    fclose(hFile);
+
+    log_amx("[SECTIA 16] Manele incarcate: %d melodii.", g_iSongCount);
 }
 
 stock bool:IsCellName(const szName[])

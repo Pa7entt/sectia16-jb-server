@@ -363,9 +363,22 @@ def gen_lose():
     write_wav("lose.wav", out)
 
 
+def gen_ding():
+    print("[*] Ding (atentie / Simon ales / LR pornit)...")
+    # clopotel scurt si stralucitor: fundamental + partiali sus, dublu-lovitura
+    total = [0.0] * sec(1.1)
+    place(bell(NOTE["A5"], 1.0, 0.55), total, 0.0)
+    place(bell(NOTE["C6"], 0.9, 0.30), total, 0.0)
+    place(bell(NOTE["A5"] * 2, 0.7, 0.18), total, 0.0)
+    place(bell(NOTE["A5"], 0.6, 0.28), total, 0.16)
+    place(bell(NOTE["C6"], 0.5, 0.14), total, 0.16)
+    write_wav("ding.wav", total)
+
+
 def main():
     print(f"SECTIA 16 - generare efecte sonore -> {OUT_DIR}\n")
     gen_fluierat()
+    gen_ding()
     gen_manea1()
     gen_manea2()
     gen_manea_loud()

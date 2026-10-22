@@ -12,13 +12,15 @@
 #                           userul care ruleaza serverul se deduce din director)
 #          S16_USER=...     user dedicat (implicit: dedus din S16_DIR)
 #          S16_PORT=27015   portul serverului
-#          S16_MAP=jb_snow  harta de start (fallback automat pe de_dust2)
+#          S16_MAP=jail_xmf  harta de start (fallback automat pe de_dust2)
+#          S16_SKIP_MAPS=1  nu descarca pachetul de harti JB (loadcs.com)
 # ============================================================
 set -euo pipefail
 
 S16_SERVICE="sectia16"
 S16_PORT="${S16_PORT:-27015}"
-S16_MAP="${S16_MAP:-jb_snow}"
+S16_MAP="${S16_MAP:-jail_xmf}"
+S16_SKIP_MAPS="${S16_SKIP_MAPS:-0}"
 S16_REPO="Pa7entt/sectia16-jb-server"
 STEAMCMD_DIR="${STEAMCMD_DIR:-/opt/steamcmd}"
 WORKDIR="$(mktemp -d /tmp/sectia16.XXXXXX)"
@@ -284,9 +286,24 @@ if ! grep -q '^rcon_password' "${S16_DIR}/cstrike/server.cfg"; then
     echo "rcon_password \"${RCON_PW}\"" >> "${S16_DIR}/cstrike/server.cfg"
 fi
 
+# harti jailbreak oficiale (loadcs.com, ~100 MB) - instalate automat
+# S16_SKIP_MAPS=1 sare peste acest pas
+if [ "${S16_SKIP_MAPS}" != "1" ] && [ ! -f "${S16_DIR}/cstrike/maps/jail_xmf.bsp" ]; then
+    say "Descarc pachetul oficial de harti JB (loadcs.com, ~100 MB)..."
+    MAPS_TMP="$(mktemp /tmp/sectia16-maps.XXXXXX.zip)"
+    if curl -fSL --retry 3 --retry-delay 2 -o "${MAPS_TMP}" "https://loadcs.com/download/maps/3/"; then
+        unzip -oq "${MAPS_TMP}" -d "${S16_DIR}" && say "Harti JB instalate."
+        rm -f "${MAPS_TMP}"
+    else
+        rm -f "${MAPS_TMP}"
+        say "ATENTIE: pachetul de harti nu s-a putut descarca."
+        say "Ruleaza mai tarziu: bash tools/get_maps.sh \"${S16_DIR}\""
+    fi
+fi
+
 # harta: fallback daca nu exista pe server
 if [ ! -f "${S16_DIR}/cstrike/maps/${S16_MAP}.bsp" ]; then
-    say "harta ${S16_MAP}.bsp nu exista - folosesc de_dust2 (pune hartile JB in cstrike/maps/)."
+    say "harta ${S16_MAP}.bsp nu exista - folosesc de_dust2 (ruleaza tools/get_maps.sh)."
     S16_MAP="de_dust2"
 fi
 
@@ -305,6 +322,7 @@ Type=simple
 User=${S16_USER}
 Group=${S16_GROUP}
 WorkingDirectory=${S16_DIR}
+Environment=TZ=Europe/Bucharest
 ExecStart=${S16_DIR}/hlds_run -game cstrike -port ${S16_PORT} +map ${S16_MAP} +maxplayers 32 -secure
 Restart=on-failure
 RestartSec=5
@@ -357,8 +375,9 @@ echo "  RCON     :  ${RCON_PW}  (salvat si in cstrike/server.cfg)"
 echo "  Harta    :  ${S16_MAP}  (schimba cu: S16_MAP=jb_harta_ta)"
 echo ""
 echo "  Urmatorii pasi (optionali):"
-echo "   1. Pune hartile JB in ${S16_DIR}/cstrike/maps/ si actualizeaza mapcycle.txt"
+echo "   1. Modele jucatori: bash tools/get_models.sh \"${S16_DIR}\" (gamebanana)"
 echo "   2. Configureaza FastDL in cstrike/server.cfg (sv_downloadurl)"
-echo "   3. Adauga admini in cstrike/addons/amxmodx/configs/users.ini"
-echo "   4. Configureaza celulele hartii in configs/sectia16/cells.ini"
+echo "   3. Adauga admini in cstrike/addons/amxmodx/configs/users.ini (VIP = flag t)"
+echo "   4. Manele proprii: sound/sectia16/manele/ + configs/sectia16/manele.ini"
+echo "   5. Configureaza celulele hartii in configs/sectia16/cells.ini"
 echo ""

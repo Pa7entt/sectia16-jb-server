@@ -1,8 +1,25 @@
-de_dust2
-de_dust
-de_aztec
-cs_assault
-de_nuke
-de_train
-cs_office
-de_inferno
+// ============================================================
+//  SECTIA 16 - jb.sectia16.ro | Jailbreak Counter-Strike 1.6
+//  mapcycle.txt - harti jailbreak oficiale (pachetul loadcs.com)
+//  Instalare: ruleaza tools/get_maps.sh (sau bootstrap.sh le ia singur)
+// ============================================================
+jail_xmf
+jail_armageddon
+jail_beach_v3
+jail_buyukisyan_v8
+jail_crewkule
+jail_desert
+jail_dust
+jail_greytown
+jail_rats
+jail_rehab
+jail_revolution
+jail_sanctuary
+jail_school
+jail_warden
+jailbreak_peter
+jb_oasis
+jb_snow
+jail_tv3
+jail_czone
+jail_moviecik_v4

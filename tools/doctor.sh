@@ -19,7 +19,7 @@ set -euo pipefail
 
 S16_SERVICE="sectia16"
 S16_PORT="${S16_PORT:-27015}"
-S16_MAP="${S16_MAP:-jb_snow}"
+S16_MAP="${S16_MAP:-jail_xmf}"
 S16_REPO="Pa7entt/sectia16-jb-server"
 WORKDIR="$(mktemp -d /tmp/sectia16-doctor.XXXXXX)"
 
@@ -244,7 +244,7 @@ fi
 
 # harta: fallback daca nu exista pe server
 if [ ! -f "${S16_DIR}/cstrike/maps/${S16_MAP}.bsp" ]; then
-    say "harta ${S16_MAP}.bsp nu exista - folosesc de_dust2 (pune hartile JB in cstrike/maps/)."
+    say "harta ${S16_MAP}.bsp nu exista - folosesc de_dust2 (ruleaza tools/get_maps.sh \"${S16_DIR}\")."
     S16_MAP="de_dust2"
 fi
 
@@ -263,6 +263,7 @@ Type=simple
 User=${S16_USER}
 Group=${S16_GROUP}
 WorkingDirectory=${S16_DIR}
+Environment=TZ=Europe/Bucharest
 ExecStart=${S16_DIR}/hlds_run -game cstrike -port ${S16_PORT} +map ${S16_MAP} +maxplayers 32 -secure
 Restart=on-failure
 RestartSec=5
@@ -300,9 +301,16 @@ if [ "${BOOTED}" -eq 1 ]; then
     python3 "${WORKDIR}/repo/tools/rcon.py" 127.0.0.1 "${S16_PORT}" "${RCON_PW}" "version" || true
     echo ""
     say "Pluginuri AMXX (verificat live prin RCON):"
-    python3 "${WORKDIR}/repo/tools/rcon.py" 127.0.0.1 "${S16_PORT}" "${RCON_PW}" "amxx plugins" || true
+    AMXX_OUT="$(python3 "${WORKDIR}/repo/tools/rcon.py" 127.0.0.1 "${S16_PORT}" "${RCON_PW}" "amxx plugins" || true)"
+    echo "${AMXX_OUT}"
     echo ""
-    say "Daca vezi 'sectia16_*' cu status 'running' -> TOTUL E OK."
+    S16_COUNT="$(echo "${AMXX_OUT}" | grep -c 'sectia16_.*running')"
+    if [ "${S16_COUNT}" -ge 10 ]; then
+        say "VERIFICARE OK: ${S16_COUNT} pluginuri SECTIA 16 running (v2.0 = 10)."
+    else
+        say "ATENTIE: doar ${S16_COUNT} pluginuri sectia16 ruleaza (astept 10)."
+        say "Vezi: journalctl -u ${S16_SERVICE} -n 50 --no-pager"
+    fi
 else
     say "ATENTIE: serverul nu a raspuns la RCON in ~60s."
     say "Vezi log-ul: journalctl -u ${S16_SERVICE} -n 50 --no-pager"

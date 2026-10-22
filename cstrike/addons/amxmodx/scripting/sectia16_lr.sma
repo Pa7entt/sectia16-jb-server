@@ -1,32 +1,47 @@
 /*
 *   SECTIA 16 - Jailbreak CS 1.6 (jb.sectia16.ro)
-*   Last Request (meniul ultimului detinut):
-*     - Duel cu Deagle la Cap ....... 1v1 Deagle, doar headshot-uri (Ham_TraceAttack)
-*     - Palme Sanatoase ............. duel de cutit la 35 HP
-*     - Barbut / Zaruri ............. zar 1-6, zarul mic moare instant
-*     - Cine Stie Castiga ........... intrebare din cultura pop romaneasca, raspuns in chat
-*   Castigatorul: +100 HP, glow verde, +500 credite.
+*   Last Request v2.0 (meniul ultimului detinut):
+*
+*   DUELURI:
+*     - Deagle la Cap ............ 1v1 Deagle, doar headshot-uri (TraceAttack)
+*     - Shot 4 Shot .............. Deagle cu UN glont, alternativ
+*     - Cowboy ................... spate in spate, inghetati 3 secunde, apoi TRAGETI
+*     - Palme Sanatoase .......... duel de cutit la 35 HP
+*     - Barbut / Zaruri .......... zar 1-6, zarul mic moare instant
+*     - Trivia ................... intrebare din trivia.ini, raspuns in chat
+*
+*   VOCE: in timpul LR-ului ambii participantii primesc microfon.
+*
+*   RECOMPENSA (detinutul castiga):
+*     meniu cu 2 optiuni:
+*       1. +3000 credite (se adauga in vault)
+*       2. FreeDay GARANTAT runda viitoare
 */
 
 #include <amxmodx>
 #include <reapi>
 #include <fakemeta>
 #include <hamsandwich>
+#include <cstrike>
 #include <sectia16>
 
 #pragma semicolon 1
 #pragma tabsize 4
 
 #define PLUGIN  "SECTIA 16 | Last Request"
-#define VERSION "1.0.0"
+#define VERSION "2.0.0"
 #define AUTHOR  "SECTIA 16"
 
 #define TASK_TRIVIA_TIMEOUT 624100
+#define TASK_REWARD_TIMEOUT 624200
+#define TASK_S4S_TURN       624300
 
 enum (+= 1)
 {
     LR_NONE = 0,
     LR_DEAGLE,
+    LR_S4S,
+    LR_COWBOY,
     LR_PALME,
     LR_BARBUT,
     LR_TRIVIA
@@ -37,6 +52,9 @@ new g_iLRT;
 new g_iLRCT;
 new bool:g_bLRActive;
 new bool:g_bLRUsed;
+
+// cine trage in Shot 4 Shot (0 = nimeni)
+new g_iS4sTurn;
 
 // trivia
 #define MAX_TRIVIA 40
@@ -58,6 +76,7 @@ public plugin_init()
     register_event("DeathMsg", "EventDeathMsg", "a");
 
     RegisterHam(Ham_TraceAttack, "player", "OnTraceAttack", 0);
+    RegisterHam(Ham_Weapon_PrimaryAttack, "weapon_deagle", "OnDeaglePrimary", 1);
 }
 
 public plugin_cfg()
@@ -70,6 +89,8 @@ public plugin_precache()
     S16_PrecacheSound("sectia16/zar");
     S16_PrecacheSound("sectia16/win");
     S16_PrecacheSound("sectia16/lose");
+    S16_PrecacheSound("sectia16/ding");
+    S16_PrecacheSound("sectia16/fluierat");
 }
 
 /* ====================================================
@@ -96,9 +117,6 @@ bool:IsLastPrisoner(const id)
     if (g_bLRActive || g_bLRUsed)
         return false;
 
-    if (s16_get_day() != -1)
-        return false;
-
     if (S16_CountAlive(TEAM_TERRORIST) != 1 || S16_CountAlive(TEAM_CT) < 1)
         return false;
 
@@ -110,9 +128,11 @@ ShowLRMenu(const id)
     new iMenu = menu_create("\r[SECTIA 16] \yLast Request^n\dAlege-ti soarta, detinute!", "LRMenuHandler");
 
     menu_additem(iMenu, "\wDuel cu \rDeagle la Cap^n\dDoar headshot-urile conta", "1");
-    menu_additem(iMenu, "\wPalme \ySanatoase^n\dCutit la 35 HP, barbateste", "2");
-    menu_additem(iMenu, "\wBarbut / \rZaruri^n\dZarul mic moare instant", "3");
-    menu_additem(iMenu, "\wCine \yStie Castiga^n\dIntrebare cu raspuns in chat", "4");
+    menu_additem(iMenu, "\wShot \y4 Shot^n\dDeagle cu un glont, pe rand", "2");
+    menu_additem(iMenu, "\wCowboy \rDuel^n\dSpate in spate, inghetati 3 secunde", "3");
+    menu_additem(iMenu, "\wPalme \ySanatoase^n\dCutit la 35 HP, barbateste", "4");
+    menu_additem(iMenu, "\wBarbut / \rZaruri^n\dZarul mic moare instant", "5");
+    menu_additem(iMenu, "\wCine \yStie Castiga^n\dIntrebare cu raspuns in chat", "6");
 
     menu_setprop(iMenu, MPROP_EXITNAME, "Mai traiesc o clipa");
 
@@ -141,16 +161,18 @@ public LRMenuHandler(const id, const iMenu, const iItem)
     new iCT = FindNearestGuard(id);
     if (!iCT)
     {
-        S16_Print(id, "^4[SECTIA 16]^1 Nu exista gardiani in viata. Norocosule.");
+        S16_Print(id, "^4[SECTIA 16]^1 Nu exista gardieni in viata. Norocosule.");
         return PLUGIN_HANDLED;
     }
 
     switch (szInfo[0])
     {
         case '1': LRStart(LR_DEAGLE, id, iCT);
-        case '2': LRStart(LR_PALME,  id, iCT);
-        case '3': LRStart(LR_BARBUT, id, iCT);
-        case '4': LRStart(LR_TRIVIA, id, iCT);
+        case '2': LRStart(LR_S4S,    id, iCT);
+        case '3': LRStart(LR_COWBOY, id, iCT);
+        case '4': LRStart(LR_PALME,  id, iCT);
+        case '5': LRStart(LR_BARBUT, id, iCT);
+        case '6': LRStart(LR_TRIVIA, id, iCT);
     }
 
     return PLUGIN_HANDLED;
@@ -190,11 +212,16 @@ LRStart(const iType, const iT, const iCT)
     if (!is_user_alive(iT) || !is_user_alive(iCT))
         return;
 
-    g_iLRType  = iType;
-    g_iLRT      = iT;
-    g_iLRCT    = iCT;
+    g_iLRType   = iType;
+    g_iLRT       = iT;
+    g_iLRCT     = iCT;
     g_bLRActive = true;
     g_bLRUsed   = true;
+    g_iS4sTurn = 0;
+
+    // ambii participantii primesc microfon in timpul LR-ului
+    s16_set_lr_voice(iT, true);
+    s16_set_lr_voice(iCT, true);
 
     new szT[32], szCT[32];
     get_user_name(iT, szT, charsmax(szT));
@@ -206,6 +233,7 @@ LRStart(const iType, const iT, const iCT)
     S16_RenderGlow(iT, 255, 200, 0, 70);
     S16_RenderGlow(iCT, 255, 200, 0, 70);
 
+    S16_PlaySoundAll("sectia16/ding");
     S16_PrintAll("^4[SECTIA 16]^1 LAST REQUEST: ^3%s^1 vs ^3%s^1! Nu interventionati in duel!", szT, szCT);
 
     switch (iType)
@@ -223,6 +251,50 @@ LRStart(const iType, const iT, const iCT)
 
             set_dhudmessage(255, 0, 0, -1.0, 0.22, 0, 8.0, 5.0);
             show_dhudmessage(0, "*** DUEL CU DEAGLE LA CAP ***^nDoar headshot-urile trag!");
+        }
+
+        case LR_S4S:
+        {
+            rg_remove_all_items(iT, false);
+            rg_remove_all_items(iCT, false);
+            rg_give_item(iT, "weapon_deagle");
+            rg_give_item(iCT, "weapon_deagle");
+            rg_set_user_bpammo(iT, WEAPON_DEAGLE, 0);
+            rg_set_user_bpammo(iCT, WEAPON_DEAGLE, 0);
+            set_pev(iT, pev_health, 100.0);
+            set_pev(iCT, pev_health, 100.0);
+
+            // cate un glont in incarcator, fara rezerva
+            SetDeagleClip(iT, 1);
+            SetDeagleClip(iCT, 1);
+
+            g_iS4sTurn = iT;
+
+            set_dhudmessage(255, 200, 0, -1.0, 0.22, 0, 8.0, 5.0);
+            show_dhudmessage(0, "*** SHOT 4 SHOT ***^nCate un glont, pe rand! Detinutul incepe!");
+
+            S16_PrintAll("^4[SECTIA 16]^1 Shot 4 Shot: dupa fiecare foc, glontul trece la celalalt.");
+        }
+
+        case LR_COWBOY:
+        {
+            rg_remove_all_items(iT, false);
+            rg_remove_all_items(iCT, false);
+            rg_give_item(iT, "weapon_deagle");
+            rg_give_item(iCT, "weapon_deagle");
+            rg_set_user_bpammo(iT, WEAPON_DEAGLE, 35);
+            rg_set_user_bpammo(iCT, WEAPON_DEAGLE, 35);
+            set_pev(iT, pev_health, 100.0);
+            set_pev(iCT, pev_health, 100.0);
+
+            // inghetati 3 secunde, spate in spate
+            S16_Freeze(iT, 3.0);
+            S16_Freeze(iCT, 3.0);
+
+            set_dhudmessage(255, 200, 0, -1.0, 0.22, 0, 8.0, 5.0);
+            show_dhudmessage(0, "*** COWBOY DUEL ***^nInghetati 3 secunde... apoi TRAGETI!");
+
+            set_task(3.0, "TaskCowboyStart", _, _, _, "a", 1);
         }
 
         case LR_PALME:
@@ -269,7 +341,7 @@ LRStart(const iType, const iT, const iCT)
             show_dhudmessage(0, "*** CINE STIE CASTIGA ***^nPrimul care raspunde corect in chat castiga!");
 
             S16_PrintAll("^4[SECTIA 16]^3 INTREBARE:^1 %s", g_szTriviaQ[g_iTriviaIdx]);
-            S16_PrintAll("^4[SECTIA 16]^1 Au ^330 de secunde^1. Tastati raspunsul in chat!");
+            S16_PrintAll("^4[SECTIA 16]^1 Aveti ^330 de secunde^1. Tastati raspunsul in chat!");
 
             set_task(30.0, "TaskTriviaTimeout", TASK_TRIVIA_TIMEOUT);
         }
@@ -321,6 +393,71 @@ PlaceFaceToFace(const iT, const iCT)
     set_pev(iT, pev_v_angle, fAngT);
     set_pev(iCT, pev_angles, fAngCT);
     set_pev(iCT, pev_v_angle, fAngCT);
+}
+
+/* ====================================================
+*   SHOT 4 SHOT (transferul glontului)
+*  ==================================================== */
+
+SetDeagleClip(const id, const iAmmo)
+{
+    new iEnt = get_member(id, m_pActiveItem);
+    if (iEnt > 0)
+        cs_set_weapon_ammo(iEnt, iAmmo);
+}
+
+public OnDeaglePrimary(const iEnt)
+{
+    if (!g_bLRActive || g_iLRType != LR_S4S)
+        return HAM_IGNORED;
+
+    new iShooter = get_member(iEnt, m_pPlayer);
+    if (!iShooter || (iShooter != g_iLRT && iShooter != g_iLRCT))
+        return HAM_IGNORED;
+
+    if (!is_user_connected(iShooter) || !is_user_alive(iShooter))
+        return HAM_IGNORED;
+
+    new iOther = (iShooter == g_iLRT) ? g_iLRCT : g_iLRT;
+
+    // glontul trece la celalalt
+    g_iS4sTurn = iOther;
+    set_task(0.7, "TaskS4sGiveBullet", TASK_S4S_TURN);
+
+    return HAM_IGNORED;
+}
+
+public TaskS4sGiveBullet()
+{
+    if (!g_bLRActive || g_iLRType != LR_S4S)
+        return;
+
+    new iId = g_iS4sTurn;
+    if (!iId || !is_user_alive(iId))
+        return;
+
+    SetDeagleClip(iId, 1);
+
+    new szName[32];
+    get_user_name(iId, szName, charsmax(szName));
+    S16_PrintAll("^4[SECTIA 16]^1 Randul lui ^3%s^1!", szName);
+}
+
+/* ====================================================
+*   COWBOY
+*  ==================================================== */
+
+public TaskCowboyStart()
+{
+    if (!g_bLRActive || g_iLRType != LR_COWBOY)
+        return;
+
+    S16_PlaySoundAll("sectia16/fluierat");
+
+    set_dhudmessage(255, 0, 0, -1.0, 0.25, 0, 6.0, 4.0);
+    show_dhudmessage(0, "*** TRAGETI, COWBOY! ***");
+
+    S16_PrintAll("^4[SECTIA 16]^1 TRAGETI! Cel mai rapid deget din vest castiga!");
 }
 
 /* ====================================================
@@ -434,7 +571,7 @@ public TaskTriviaTimeout()
     S16_PrintAll("^4[SECTIA 16]^1 Timpul a expirat! Nimeni nu a stiut. ^3Amandoi mor^1, pedagogic.");
 
     set_task(0.1, "TaskDiceKill", g_iLRT);
-    set_task(0.1, "TaskDiceKill", g_iLRCT);
+    set_task(0.2, "TaskDiceKill", g_iLRCT);
 }
 
 bool:AnswerMatches(const szAccepted[], const szInput[])
@@ -482,7 +619,7 @@ bool:AnswerMatches(const szAccepted[], const szInput[])
 }
 
 /* ====================================================
-*   FINAL LR & EVENTS
+*   FINAL LR + RECOMPENSA
 *  ==================================================== */
 
 public EventDeathMsg()
@@ -522,6 +659,16 @@ public TaskOfferLR(id)
     ShowLRMenu(id);
 }
 
+public client_disconnected(id)
+{
+    if (g_bLRActive && (id == g_iLRT || id == g_iLRCT))
+    {
+        // adversul care ramane castiga prin abandon... doar daca e detinutul
+        new iWinner = (id == g_iLRT) ? g_iLRCT : g_iLRT;
+        LREnd(iWinner, id);
+    }
+}
+
 LREnd(const iWinner, const iLoser)
 {
     if (!g_bLRActive)
@@ -529,42 +676,132 @@ LREnd(const iWinner, const iLoser)
 
     g_bLRActive = false;
     g_iLRType = LR_NONE;
+    g_iS4sTurn = 0;
 
     remove_task(TASK_TRIVIA_TIMEOUT);
+    remove_task(TASK_S4S_TURN);
 
     new iT = g_iLRT, iCT = g_iLRCT;
     g_iLRT = 0;
     g_iLRCT = 0;
 
+    // microfonul LR se revoca
     if (is_user_connected(iT))
+    {
+        s16_set_lr_voice(iT, false);
         S16_RenderReset(iT);
+    }
     if (is_user_connected(iCT))
+    {
+        s16_set_lr_voice(iCT, false);
         S16_RenderReset(iCT);
+    }
 
     new szWinner[32], szLoser[32];
     get_user_name(iWinner, szWinner, charsmax(szWinner));
     get_user_name(iLoser, szLoser, charsmax(szLoser));
 
-    if (is_user_alive(iWinner))
-    {
-        set_pev(iWinner, pev_health, 100.0);
-        S16_RenderGlow(iWinner, 0, 255, 0, 90);
-        s16_add_credits(iWinner, 500);
-    }
-
     S16_PlaySoundAll("sectia16/win");
 
-    set_dhudmessage(0, 255, 0, -1.0, 0.25, 0, 8.0, 5.0);
-    show_dhudmessage(0, "*** %s A CASTIGAT LAST REQUEST-UL! ***^n%s s-a ales cu praful. +500 credite", szWinner, szLoser);
+    // detinutul castigator isi alege RECOMPENSA
+    if (iWinner == iT && is_user_connected(iT) && is_user_alive(iT))
+    {
+        set_pev(iT, pev_health, 100.0);
+        S16_RenderGlow(iT, 0, 255, 0, 90);
+
+        set_dhudmessage(0, 255, 0, -1.0, 0.25, 0, 8.0, 5.0);
+        show_dhudmessage(0, "*** %s A CASTIGAT LAST REQUEST-UL! ***^nAlege-ti recompensa din meniu!", szWinner);
+
+        S16_PrintAll("^4[SECTIA 16]^1 ^3%s^1 a castigat Last Request-ul impotriva lui %s!", szWinner, szLoser);
+
+        ShowRewardMenu(iT);
+    }
+    else
+    {
+        set_dhudmessage(255, 60, 60, -1.0, 0.25, 0, 8.0, 5.0);
+        show_dhudmessage(0, "*** %s A PIERDUT LAST REQUEST-UL ***^nLegea e lege.", szLoser);
+
+        S16_PrintAll("^4[SECTIA 16]^1 Gardianul ^3%s^1 l-a invins pe ^3%s^1 la Last Request.", szWinner, szLoser);
+    }
+}
+
+// RECOMPENSA LR: credite SAU freeday garantat runda viitoare
+ShowRewardMenu(const id)
+{
+    if (!is_user_connected(id) || !is_user_alive(id))
+        return;
+
+    new iMenu = menu_create("\r[SECTIA 16] \yRecompensa Last Request^n\dAi castigat! Alege-ti premiul:", "RewardMenuHandler");
+
+    menu_additem(iMenu, "\w+3000 \yCredite^n\dDirect in vault, pentru shop", "1");
+    menu_additem(iMenu, "\wFreeDay \rGARANTAT^n\dRunda viitoare esti liber", "2");
+
+    menu_setprop(iMenu, MPROP_EXIT, MEXIT_NEVER);
+    menu_setprop(iMenu, MPROP_EXITNAME, "Alege!");
+
+    menu_display(id, iMenu, 0);
+
+    // 15 secunde de ezitare = creditele intra automat
+    remove_task(id + TASK_REWARD_TIMEOUT);
+    set_task(15.0, "TaskRewardTimeout", id + TASK_REWARD_TIMEOUT, _, _, "a", 1);
+}
+
+public RewardMenuHandler(const id, const iMenu, const iItem)
+{
+    if (iItem < 0 || !is_user_connected(id))
+    {
+        menu_destroy(iMenu);
+        return PLUGIN_HANDLED;
+    }
+
+    remove_task(id + TASK_REWARD_TIMEOUT);
+    menu_destroy(iMenu);
+
+    switch (iItem)
+    {
+        case 0:
+        {
+            s16_add_credits(id, 3000);
+            S16_Print(id, "^4[SECTIA 16]^1 Recompensa LR: ^43000 credite^1. Bafta la shop!");
+            S16_PrintAll("^4[SECTIA 16]^1 Castigatorul LR a ales ^43000 de credite^1.");
+        }
+        case 1:
+        {
+            s16_queue_freeday(id);
+            S16_Print(id, "^4[SECTIA 16]^1 Recompensa LR: ^4FreeDay garantat^1 runda viitoare!");
+            S16_PrintAll("^4[SECTIA 16]^1 Castigatorul LR a ales ^4FreeDay garantat^1 pentru runda viitoare.");
+        }
+    }
+
+    return PLUGIN_HANDLED;
+}
+
+public TaskRewardTimeout(const iTaskId)
+{
+    // nu a ales la timp? creditele intra automat
+    new id = iTaskId - TASK_REWARD_TIMEOUT;
+
+    if (!is_user_connected(id))
+        return;
+
+    // inchidem meniul afisat
+    show_menu(id, 0, "^n", 0);
+
+    s16_add_credits(id, 3000);
+    S16_Print(id, "^4[SECTIA 16]^1 Timpul a expirat - recompensa LR: ^43000 credite^1.");
 }
 
 public EventNewRound()
 {
     g_bLRActive = false;
-    g_bLRUsed = false;
-    g_iLRType = LR_NONE;
-    g_iLRT = 0;
-    g_iLRCT = 0;
+    g_bLRUsed   = false;
+    g_iLRType   = LR_NONE;
+    g_iLRT       = 0;
+    g_iLRCT     = 0;
+    g_iS4sTurn  = 0;
+
+    remove_task(TASK_TRIVIA_TIMEOUT);
+    remove_task(TASK_S4S_TURN);
 }
 
 /* ====================================================
