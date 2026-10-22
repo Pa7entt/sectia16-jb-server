@@ -92,19 +92,24 @@ Variabile suportate: `S16_DIR` (director instalare), `S16_USER` (user dedicat, d
 După bootstrap, instalează pachetul oficial de harti JB (30+ hărți + wad-uri + skybox-uri, ~100 MB):
 
 ```bash
-sudo bash tools/get_maps.sh "$HOME/Documents/sv"
-# sau: S16_DIR="$HOME/Documents/sv" bash tools/get_maps.sh
+curl -fsSL https://raw.githubusercontent.com/Pa7entt/sectia16-jb-server/main/tools/get_maps.sh | bash -s "$HOME/Documents/sv"
 ```
+
+(Funcționează din orice director — nu trebuie să ai repo-ul clonat. Dacă ai repo-ul: `bash tools/get_maps.sh "$HOME/Documents/sv"`.)
 
 `mapcycle.txt` din repo conține deja selecția (jail_xmf, jail_armageddon, jail_beach_v3, jail_rats, jb_oasis, jb_snow etc.).
 
 ### Modelele de jucători (gamebanana)
 
 ```bash
-sudo bash tools/get_models.sh "$HOME/Documents/sv"
+curl -fsSL https://raw.githubusercontent.com/Pa7entt/sectia16-jb-server/main/tools/get_models.sh | bash -s "$HOME/Documents/sv"
 ```
 
-Descarcă și instalează automat: CT (mods/730051), CT Simon (mods/224557), T (mods/224530), T rebel (mods/727403), T freeday (mods/224468) și 7 modele VIP (mods/724163, 730210, 730293, cats/12761, 719937, 716248, 723750). Dacă gamebanana blochează descărcarea automată, scriptul afișează link-ul și calea exactă pentru instalare manuală. **Modelele lipsă nu afectează deloc serverul** — pluginul folosește modelele default CS.
+(Funcționează din orice director — nu trebuie să ai repo-ul clonat.)
+
+Scriptul rezolvă automat link-ul real de download prin API-ul gamebanana (numărul din `/mods/<id>` **nu e același** cu cel din `/dl/<id>`), dezarhivează ZIP/RAR (inclusiv RAR solid — instalează `unar` automat dacă lipsește) și alege modelul de **player** (ignoră modelele de arme `v_*`/`w_*`/`p_*`).
+
+Descarcă și instalează automat: CT (mods/730051), CT Simon (mods/224557), T (mods/224530), T rebel (mods/727403), T freeday (mods/224468) și 7 modele VIP (mods/724163, 730210, 730293, 227525 Goku, 719937, 716248, 723750). Dacă un model esuează, serverul NU pica — pluginul ignoră modelele lipsă și folosește modelele default CS.
 
 ### Reparare rapidă (fără reinstalare)
 
@@ -119,7 +124,7 @@ curl -fsSL https://raw.githubusercontent.com/Pa7entt/sectia16-jb-server/main/too
 ```bash
 # 1. i386 multilib + dependente
 sudo dpkg --add-architecture i386 && sudo apt update
-sudo apt install -y curl ca-certificates tar xz unzip git python3 \
+sudo apt install -y curl ca-certificates tar xz unzip unar git python3 \
                     libc6:i386 lib32gcc-s1 lib32stdc++6 lib32z1
 
 # 2. utilizator dedicat

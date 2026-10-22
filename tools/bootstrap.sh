@@ -78,6 +78,8 @@ say "1/10 - Dependențe sistem + arhitectura i386..."
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
 apt-get install -y curl ca-certificates tar xz unzip git python3 perl bash
+# unar: dezarhivare RAR (inclusiv rar solid) pentru get_models.sh - optional, non-fatal
+apt-get install -y unar 2>/dev/null || echo "[s16] NOTE: 'unar' nu s-a putut instala - scriptul get_models.sh il va instala la nevoie."
 
 if ! dpkg --print-foreign-architectures | grep -q i386; then
     dpkg --add-architecture i386
