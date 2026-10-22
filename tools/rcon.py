@@ -5,6 +5,7 @@
 #
 #  Usage: rcon.py <ip> <port> <parola_rcon> [comanda ...]
 # ============================================================
+import re
 import socket
 import sys
 import time
@@ -40,22 +41,26 @@ def main():
                 out += s.recv(65536)
             except socket.timeout:
                 break
+            except OSError:
+                break
         return out.decode("utf-8", "replace")
 
-    # 1) challenge
+    # 1) challenge — raspunsul GoldSrc: "challenge rcon <numar>\n\x00"
+    #    (atenție la NUL-ul final: split() nu il tratează ca whitespace)
     xmit("challenge rcon")
     r = drain(3.0)
-    if "challenge " not in r:
+    m = re.search(r"challenge\s+rcon\s+(\d+)", r)
+    if not m:
         print("EROARE: niciun challenge RCON (serverul e pornit pe portul %d?)"
               % port, file=sys.stderr)
         return 1
-    challenge = r.split("challenge ", 1)[1].strip().split()[0]
+    challenge = m.group(1)
 
-    # 2) comanda
+    # 2) comanda — format GoldSrc: rcon <challenge> <parola> <comanda>
+    #    (FARA ghilimele in jurul parolei — alea sunt protocol Source)
     time.sleep(0.1)
-    xmit('rcon %s "%s" %s' % (challenge, pw, cmd))
+    xmit("rcon %s %s %s" % (challenge, pw, cmd))
     out = drain(2.5)
-
     lines = [l.rstrip() for l in out.replace("\xff", "").splitlines()
              if l.strip()]
     print("\n".join(lines) if lines else "(fara raspuns)")

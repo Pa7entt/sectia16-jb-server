@@ -65,12 +65,17 @@ public plugin_init()
     g_pCvarCost[ITEM_PALINCA] = register_cvar("s16_cost_palinca", "400");
     g_pCvarCost[ITEM_MANTA]   = register_cvar("s16_cost_manta",   "900");
 
+    set_task(60.0, "TaskMinuteCredits", TASK_MINUTE,   _, _, "b");
+    set_task(0.25, "TaskMaintain",      TASK_MAINTAIN, _, _, "b");
+}
+
+// nativii cross-plugin se inregistreaza AICI (nu in plugin_init) ca sa fie
+// disponibili pluginurilor incarcate dupa acesta (days/lr ii folosesc)
+public plugin_natives()
+{
     register_library("sectia16_shop");
     register_native("s16_get_credits", "NativeGetCredits");
     register_native("s16_add_credits", "NativeAddCredits");
-
-    set_task(60.0, "TaskMinuteCredits", TASK_MINUTE,   _, _, "b");
-    set_task(0.25, "TaskMaintain",      TASK_MAINTAIN, _, _, "b");
 }
 
 public plugin_precache()

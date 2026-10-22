@@ -56,7 +56,12 @@ public plugin_init()
     register_event("DeathMsg", "EventDeathMsg", "a");
 
     RegisterHookChain(RG_CBasePlayer_TakeDamage, "OnTakeDamage", false);
+}
 
+// nativul cross-plugin se inregistreaza AICI (nu in plugin_init)
+// ca sa fie disponibil pluginurilor incarcate dupa acesta (lr il foloseste)
+public plugin_natives()
+{
     register_library("sectia16_days");
     register_native("s16_get_day", "NativeGetDay");
 }

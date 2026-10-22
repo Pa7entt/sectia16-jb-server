@@ -231,7 +231,13 @@ curl -fsSL "https://github.com/alliedmodders/amxmodx/releases/download/${AMXX_TA
 curl -fsSL "https://github.com/alliedmodders/amxmodx/releases/download/${AMXX_TAG}/amxmodx-1.10.0-git5487-cstrike-linux.tar.gz" | tar -xz -C "${S16_DIR}/cstrike/"
 
 # metamod incarca amxx
-echo "linux addons/amxmodx/dlls/amxmodx_mm.so" > "${S16_DIR}/cstrike/addons/metamod/plugins.ini"
+# AMXX 1.10.0.5487 livreaza amxmodx_mm_i386.so (nu amxmodx_mm.so) -
+# detectam ce exista ca sa functioneze pe ambele scheme de denumire.
+AMXX_MM="amxmodx_mm.so"
+if [ -f "${S16_DIR}/cstrike/addons/amxmodx/dlls/amxmodx_mm_i386.so" ]; then
+    AMXX_MM="amxmodx_mm_i386.so"
+fi
+echo "linux addons/amxmodx/dlls/${AMXX_MM}" > "${S16_DIR}/cstrike/addons/metamod/plugins.ini"
 
 # ReAPI (modul AMXX)
 say "       + ReAPI (modul)..."

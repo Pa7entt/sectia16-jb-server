@@ -51,10 +51,15 @@ public plugin_init()
 
     g_pCvarFreezeTime = register_cvar("s16_whistle_freeze", "3");
 
+    set_task(1.0, "TaskSimonHud", TASK_SIMON_HUD, _, _, "b");
+}
+
+// nativii cross-plugin se inregistreaza AICI (nu in plugin_init) ca sa fie
+// disponibili pluginurilor incarcate dupa acesta (days/lr ii folosesc)
+public plugin_natives()
+{
     register_library("sectia16_simon");
     register_native("s16_get_simon", "NativeGetSimon");
-
-    set_task(1.0, "TaskSimonHud", TASK_SIMON_HUD, _, _, "b");
 }
 
 public plugin_cfg()

@@ -103,7 +103,8 @@ sudo -u csserver /opt/steamcmd/steamcmd.sh +force_install_dir /home/csserver/ser
 # 7. AMX Mod X 1.10 + modulul ReAPI
 curl -fsSL https://github.com/alliedmodders/amxmodx/releases/download/1.10.0.5487/amxmodx-1.10.0-git5487-base-linux.tar.gz    | sudo tar -xz -C /home/csserver/server/cstrike/
 curl -fsSL https://github.com/alliedmodders/amxmodx/releases/download/1.10.0.5487/amxmodx-1.10.0-git5487-cstrike-linux.tar.gz | sudo tar -xz -C /home/csserver/server/cstrike/
-echo "linux addons/amxmodx/dlls/amxmodx_mm.so" | sudo tee /home/csserver/server/cstrike/addons/metamod/plugins.ini
+# AMXX 1.10.0.5487: binarul e amxmodx_mm_i386.so (verifica numele din dlls/)
+echo "linux addons/amxmodx/dlls/amxmodx_mm_i386.so" | sudo tee /home/csserver/server/cstrike/addons/metamod/plugins.ini
 #    ReAPI: addons/amxmodx/modules/reapi_amxx_i386.so din https://github.com/rehlds/ReAPI/releases
 
 # 8. acest repo peste cstrike/
