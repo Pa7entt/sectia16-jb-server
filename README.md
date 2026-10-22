@@ -52,9 +52,25 @@ Pe un server Debian 13 proaspăt, ca root:
 curl -fsSL https://raw.githubusercontent.com/Pa7entt/sectia16-jb-server/main/tools/bootstrap.sh | sudo bash
 ```
 
-Scriptul face totul: activează i386 multilib, instalează SteamCMD + HLDS (CS 1.6), ReHLDS, metamod-r, ReGameDLL_CS, ReAPI, AMX Mod X 1.10, clonează repo-ul, generează parolă RCON aleatoare și pornește serviciul `sectia16` (systemd, port 27015).
+Scriptul face totul: activează i386 multilib, instalează SteamCMD + HLDS (CS 1.6), ReHLDS, metamod-r, ReGameDLL_CS, ReAPI, AMX Mod X 1.10, clonează repo-ul, generează parolă RCON aleatoare și pornește serviciul `sectia16` (systemd, port 27015). La final verifică live, prin RCON, că pluginurile s-au încărcat.
 
 Hartă alternativă: `S16_MAP=jb_snow bash tools/bootstrap.sh` (fallback automat pe `de_dust2` dacă harta nu există).
+
+Director personalizat (ex. `~/Documents/sv`) — userul care rulează serverul se deduce automat din cale:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Pa7entt/sectia16-jb-server/main/tools/bootstrap.sh | sudo S16_DIR="$HOME/Documents/sv" bash
+```
+
+Variabile suportate: `S16_DIR` (director instalare), `S16_USER` (user dedicat, dedus automat), `S16_PORT` (implicit 27015), `S16_MAP` (implicit `jb_snow`). Re-rularea scriptului = update complet (validate Steam + overlay repo + restart); parola RCON existentă se păstrează.
+
+### Reparare rapidă (fără reinstalare)
+
+Dacă serverul pornește fără pluginuri sau crapă cu `Couldn't get DLL API` (liblist.gam corupt, engine rămas vanilla, stack incomplet), rulează `doctor.sh` — reaplică ReHLDS + metamod-r + ReGameDLL_CS + ReAPI + AMX 1.10 + overlay-ul repo-ului, rescrie `liblist.gam` curat și verifică pluginurile prin RCON (~2 minute, fără SteamCMD):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Pa7entt/sectia16-jb-server/main/tools/doctor.sh | sudo S16_DIR="$HOME/Documents/sv" bash
+```
 
 ### Varianta manuală (pășile din bootstrap)
 
